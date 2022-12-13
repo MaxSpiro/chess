@@ -32,6 +32,7 @@ struct Game {
     pieces: [Vec<Piece>; 2],
 }
 
+#[derive(Debug)]
 struct Command {
     special: Option<Special>,
     piece: PieceType,
@@ -50,22 +51,25 @@ enum Special {
 }
 
 impl Command {
-    fn parse(input: &str) -> Self {
+    fn parse(input: &str) -> Option<Self> {
+        if input.len() < 2 {
+            return None;
+        }
         if input == "O-O" {
-            return Self {
+            return Some(Self {
                 piece: PieceType::King,
                 to: (6, 0),
                 takes: false,
                 special: Some(Special::Castle),
-            };
+            });
         }
         if input == "O-O-O" {
-            return Self {
+            return Some(Self {
                 piece: PieceType::King,
                 to: (2, 0),
                 takes: false,
                 special: Some(Special::LongCastle),
-            };
+            });
         }
         let mut chars = input.chars();
         let piece;
@@ -90,70 +94,96 @@ impl Command {
                 let (to, last_char, takes);
                 match chars.next().unwrap() {
                     '1'..='8' => {
-                        to = notation_to_coords(&input[0..=1]);
+                        if let Some(coords) = notation_to_coords(&input[0..=1]) {
+                            to = coords;
+                        } else {
+                            return None;
+                        }
                         last_char = chars.next();
                         takes = false;
                     }
                     'x' => {
-                        to = notation_to_coords(&input[2..=3]);
+                        if let Some(coords) = notation_to_coords(&input[2..=3]) {
+                            to = coords;
+                        } else {
+                            return None;
+                        }
                         last_char = chars.nth(2);
                         takes = true;
                     }
-                    _ => {
-                        panic!();
+                    c => {
+                        return None;
                     }
                 }
                 let special = if let Some(str) = last_char {
                     match str {
                         '+' => { Some(Special::Check) }
                         '#' => { Some(Special::Checkmate) }
-                        _ => { panic!() }
+                        _ => {
+                            return None;
+                        }
                     }
                 } else {
                     None
                 };
-                return Self {
+                if special.is_some() && chars.next().is_some() {
+                    return None;
+                }
+                return Some(Self {
                     piece,
                     to,
                     takes,
                     special,
-                };
+                });
             }
             _ => {
-                panic!("Invalid piece");
+                return None;
             }
         }
         let (to, takes, last_char);
         match chars.next().unwrap() {
             'a'..='h' => {
-                to = notation_to_coords(&input[1..=2]);
+                if let Some(coords) = notation_to_coords(&input[1..=2]) {
+                    to = coords;
+                } else {
+                    return None;
+                }
                 takes = false;
                 last_char = chars.nth(1);
             }
             'x' => {
-                to = notation_to_coords(&input[2..=3]);
+                if let Some(coords) = notation_to_coords(&input[2..=3]) {
+                    to = coords;
+                } else {
+                    return None;
+                }
                 takes = true;
                 last_char = chars.nth(2);
             }
             _ => {
-                panic!("Invalid piece");
+                return None;
             }
         }
         let special = if let Some(str) = last_char {
             match str {
                 '+' => { Some(Special::Check) }
                 '#' => { Some(Special::Checkmate) }
-                _ => { panic!() }
+                _ => {
+                    return None;
+                }
             }
         } else {
             None
         };
-        return Self {
+        if special.is_some() && chars.next().is_some() {
+            return None;
+        }
+        return Some(Self {
             to,
             takes,
             piece,
             special,
-        };
+        });
     }
 }
 
@@ -206,10 +236,14 @@ impl Game {
         let Command { to, piece, takes, .. } = input;
         let index = if self.turn == Color::White { 0 } else { 1 };
         let pieces = &self.pieces[index];
-        self.pieces[index] = pieces
-            .iter()
-            .map(|piece| { *piece })
-            .collect();
+        match input.piece {
+            PieceType::Pawn => {}
+            PieceType::Rook => {}
+            PieceType::Bishop => {}
+            PieceType::Knight => {}
+            PieceType::King => {}
+            PieceType::Queen => {}
+        }
     }
 }
 
@@ -218,17 +252,32 @@ fn main() {
     let stdin = io::stdin();
     loop {
         println!("What is your move?");
-        stdin.read_line(&mut input).unwrap();
-        println!("{:?}", input);
+
+        match io::stdin().read_line(&mut input) {
+            Ok(_) => {
+                if let Some(command) = Command::parse(&input.trim()) {
+                    println!("{:?}", command);
+                } else {
+                    println!("Invalid move");
+                }
+            }
+            Err(e) => {
+                println!("{:?}", e);
+            }
+        }
+        println!("\n");
         input.clear();
     }
 }
 
-fn notation_to_coords(notation: &str) -> (usize, usize) {
+fn notation_to_coords(notation: &str) -> Option<(usize, usize)> {
     let mut chars = notation.chars();
     let x = (chars.next().unwrap() as usize) - ('a' as usize);
     let y = (chars.next().unwrap() as usize) - ('1' as usize);
-    (x, y)
+    if x > 7 || y > 7 {
+        return None;
+    }
+    Some((x, y))
 }
 
 #[cfg(test)]
@@ -236,63 +285,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse() {
-        let command = Command::parse("Kd4");
+    fn commands() {
+        let command = Command::parse("Kd4").unwrap();
         assert_eq!(command.piece, PieceType::King);
         assert_eq!(command.to, (3, 3));
         assert_eq!(command.takes, false);
 
-        let command = Command::parse("Qd4");
+        let command = Command::parse("Qd4").unwrap();
         assert_eq!(command.piece, PieceType::Queen);
         assert_eq!(command.to, (3, 3));
         assert_eq!(command.takes, false);
 
-        let command = Command::parse("Rxa8");
+        let command = Command::parse("Rxa8").unwrap();
         assert_eq!(command.piece, PieceType::Rook);
         assert_eq!(command.to, (0, 7));
         assert_eq!(command.takes, true);
 
-        let command = Command::parse("a4");
+        let command = Command::parse("a4").unwrap();
         assert_eq!(command.piece, PieceType::Pawn);
         assert_eq!(command.to, (0, 3));
         assert_eq!(command.takes, false);
 
-        let command = Command::parse("axd4");
+        let command = Command::parse("axd4").unwrap();
         assert_eq!(command.piece, PieceType::Pawn);
         assert_eq!(command.to, (3, 3));
         assert_eq!(command.takes, true);
 
         // write me some more tests for more moves like O-O-O, Bxh8, axd3, etc.
-        let command = Command::parse("Bxh8");
+        let command = Command::parse("Bxh8").unwrap();
         assert_eq!(command.piece, PieceType::Bishop);
         assert_eq!(command.to, (7, 7));
         assert_eq!(command.takes, true);
 
-        let command = Command::parse("axd3");
+        let command = Command::parse("axd3").unwrap();
         assert_eq!(command.piece, PieceType::Pawn);
         assert_eq!(command.to, (3, 2));
         assert_eq!(command.takes, true);
 
-        let command = Command::parse("O-O-O");
+        let command = Command::parse("O-O-O").unwrap();
         assert_eq!(command.piece, PieceType::King);
         assert_eq!(command.special, Some(Special::LongCastle));
 
-        let command = Command::parse("d4+");
+        let command = Command::parse("d4+").unwrap();
         assert_eq!(command.piece, PieceType::Pawn);
         assert_eq!(command.to, (3, 3));
         assert_eq!(command.takes, false);
         assert_eq!(command.special, Some(Special::Check));
 
-        let command = Command::parse("Ba3#");
+        let command = Command::parse("Ba3#").unwrap();
         assert_eq!(command.piece, PieceType::Bishop);
         assert_eq!(command.to, (0, 2));
         assert_eq!(command.takes, false);
         assert_eq!(command.special, Some(Special::Checkmate));
 
-        let command = Command::parse("Qxh8+");
+        let command = Command::parse("Qxh8+").unwrap();
         assert_eq!(command.piece, PieceType::Queen);
         assert_eq!(command.to, (7, 7));
         assert_eq!(command.takes, true);
         assert_eq!(command.special, Some(Special::Check));
+
+        assert!(Command::parse("aa4").is_none());
+        assert!(Command::parse("Bax7").is_none());
+        assert!(Command::parse("Rxh8+#").is_none());
+        assert!(Command::parse("a").is_none());
+        assert!(Command::parse("BRh8").is_none());
+        assert!(Command::parse("hB8").is_none());
+        assert!(Command::parse("axd9").is_none());
+        assert!(Command::parse("Bj9").is_none());
+        assert!(Command::parse("Ld8").is_none());
+        assert!(Command::parse("4a").is_none());
     }
 }
