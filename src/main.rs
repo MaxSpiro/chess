@@ -42,7 +42,7 @@ enum Special {
     // Promotion,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum ChessError {
     InvalidMove,
 }
@@ -261,6 +261,7 @@ impl Game {
                         Color::Black => curr + diff,
                     }
                 };
+                // todo fix color matching
                 if
                     let Some(ref _piece @ Piece(PieceType::Pawn, _color)) = self.pieces.get(
                         &(to.0, idx(to.1, 1))
@@ -268,7 +269,10 @@ impl Game {
                 {
                     let piece = self.pieces.remove(&(to.0, idx(to.1, 1))).unwrap();
                     self.pieces.insert(to, piece);
-                } else if to.1 == (if *color == Color::White { 3 } else { 4 }) {
+                } else if
+                    (*color == Color::White && to.1 == 3) ||
+                    (*color == Color::Black && to.1 == 4)
+                {
                     if
                         let Some(ref _piece @ Piece(PieceType::Pawn, _color)) = self.pieces.get(
                             &(to.0, idx(to.1, 2))
@@ -335,6 +339,26 @@ fn notation_to_coords(notation: &str) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pawn_moves() {
+        let mut game = Game::new();
+
+        let command = Command::parse("e4").unwrap();
+        assert_eq!(game.next(command), Ok(()));
+
+        let command = Command::parse("e5").unwrap();
+        assert_eq!(game.next(command), Ok(()));
+
+        let command = Command::parse("d3").unwrap();
+        assert_eq!(game.next(command), Ok(()));
+
+        let command = Command::parse("e4").unwrap();
+        assert_eq!(game.next(command), Err(ChessError::InvalidMove));
+
+        let command = Command::parse("e3").unwrap();
+        assert_eq!(game.next(command), Err(ChessError::InvalidMove));
+    }
 
     #[test]
     fn commands() {
