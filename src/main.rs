@@ -30,6 +30,7 @@ struct Command {
     piece: PieceType,
     to: (usize, usize),
     takes: bool,
+    original: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -62,12 +63,14 @@ impl Command {
         if input.len() < 2 {
             return None;
         }
+        let original = input.to_string();
         if input == "O-O" {
             return Some(Self {
                 piece: PieceType::King,
                 to: (6, 0),
                 takes: false,
                 special: Some(Special::Castle),
+                original,
             });
         }
         if input == "O-O-O" {
@@ -76,6 +79,7 @@ impl Command {
                 to: (2, 0),
                 takes: false,
                 special: Some(Special::LongCastle),
+                original,
             });
         }
         let mut chars = input.chars();
@@ -141,6 +145,7 @@ impl Command {
                     to,
                     takes,
                     special,
+                    original,
                 });
             }
             _ => {
@@ -190,6 +195,7 @@ impl Command {
             takes,
             piece,
             special,
+            original,
         });
     }
 }
@@ -239,7 +245,7 @@ impl Game {
     }
 
     fn next(&mut self, input: Command) -> Result<(), ChessError> {
-        let Command { to, piece, takes, .. } = input;
+        let Command { to, piece, takes, original, .. } = input;
         let Game { turn: color, .. } = self;
         match self.pieces.get(&to) {
             Some(_) => {
@@ -255,35 +261,44 @@ impl Game {
         }
         match input.piece {
             PieceType::Pawn => {
-                let idx = |curr: usize, diff: usize| {
+                let diff = |curr: usize, diff: usize| {
                     match color {
                         Color::White => curr - diff,
                         Color::Black => curr + diff,
                     }
                 };
-                // todo fix color matching
-                if
-                    let Some(ref _piece @ Piece(PieceType::Pawn, _color)) = self.pieces.get(
-                        &(to.0, idx(to.1, 1))
-                    )
-                {
-                    let piece = self.pieces.remove(&(to.0, idx(to.1, 1))).unwrap();
-                    self.pieces.insert(to, piece);
-                } else if
-                    (*color == Color::White && to.1 == 3) ||
-                    (*color == Color::Black && to.1 == 4)
-                {
+                // todo optimize for space?
+                let mut possible_coords = vec![];
+                if takes {
+                    possible_coords.push((
+                        letter_to_column_index(original.chars().next().unwrap()),
+                        diff(to.1, 1),
+                    ));
+                } else {
+                    possible_coords.push((to.0, diff(to.1, 1)));
+                    if
+                        (*color == Color::White && to.1 == 3) ||
+                        (*color == Color::Black && to.1 == 4)
+                    {
+                        possible_coords.push((to.0, diff(to.1, 2)));
+                    }
+                }
+                let mut found = false;
+                for coords in possible_coords {
                     if
                         let Some(ref _piece @ Piece(PieceType::Pawn, _color)) = self.pieces.get(
-                            &(to.0, idx(to.1, 2))
+                            &coords
                         )
                     {
-                        let piece = self.pieces.remove(&(to.0, idx(to.1, 2))).unwrap();
-                        self.pieces.insert(to, piece);
-                    } else {
-                        return Err(ChessError::InvalidMove);
+                        if _color != color {
+                            continue;
+                        }
+                        found = true;
+                        let pawn = self.pieces.remove(&coords).unwrap();
+                        self.pieces.insert(to, pawn);
                     }
-                } else {
+                }
+                if !found {
                     return Err(ChessError::InvalidMove);
                 }
             }
@@ -293,7 +308,6 @@ impl Game {
             PieceType::King => {}
             PieceType::Queen => {}
         }
-
         self.turn = match self.turn {
             Color::White => Color::Black,
             Color::Black => Color::White,
@@ -336,6 +350,14 @@ fn notation_to_coords(notation: &str) -> Option<(usize, usize)> {
     Some((x, y))
 }
 
+fn letter_to_column_index(letter: char) -> usize {
+    let letter = letter.to_ascii_lowercase();
+    if letter < 'a' || letter > 'h' {
+        panic!("How did we get here? I thought we checked this already.");
+    }
+    (letter as usize) - ('a' as usize)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344,20 +366,81 @@ mod tests {
     fn pawn_moves() {
         let mut game = Game::new();
 
-        let command = Command::parse("e4").unwrap();
-        assert_eq!(game.next(command), Ok(()));
+        let commands = [
+            "e4",
+            "e5",
+            "d4",
+            "d5",
+            "c3",
+            "c6",
+            "c4",
+            "c5",
+            "c5",
+            "h4",
+            "a3",
+            "a4",
+            "a5",
+        ];
+        let expected_outputs = [
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Err(ChessError::InvalidMove),
+            Ok(()),
+            Err(ChessError::InvalidMove),
+            Err(ChessError::InvalidMove),
+            Ok(()),
+        ];
+        for i in 0..13 {
+            let command = Command::parse(commands[i]).unwrap();
+            let result = game.next(command);
+            assert_eq!(result, expected_outputs[i]);
+        }
 
-        let command = Command::parse("e5").unwrap();
-        assert_eq!(game.next(command), Ok(()));
+        game = Game::new();
+        let commands = [
+            "e4",
+            "e5",
+            "d4",
+            "exd4",
+            "c3",
+            "dxc3",
+            "a2",
+            "a5",
+            "a4",
+            "b5",
+            "axb5",
+            "a3",
+            "a6",
+            "b6",
+        ];
+        let expected_outputs = [
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Err(ChessError::InvalidMove),
+            Err(ChessError::InvalidMove),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Err(ChessError::InvalidMove),
+            Ok(()),
+            Ok(()),
+        ];
 
-        let command = Command::parse("d3").unwrap();
-        assert_eq!(game.next(command), Ok(()));
-
-        let command = Command::parse("e4").unwrap();
-        assert_eq!(game.next(command), Err(ChessError::InvalidMove));
-
-        let command = Command::parse("e3").unwrap();
-        assert_eq!(game.next(command), Err(ChessError::InvalidMove));
+        for i in 0..13 {
+            let command = Command::parse(commands[i]).unwrap();
+            let result = game.next(command);
+            assert_eq!(result, expected_outputs[i]);
+        }
     }
 
     #[test]
