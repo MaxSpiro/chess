@@ -303,22 +303,30 @@ impl Game {
                 }
             }
             PieceType::Knight => {
-                let mut possible_coords = vec![];
-                // can be optimized
-                for x in 0..8 {
-                    for y in 0..8 {
-                        if
-                            ((x as i32) - (to.0 as i32)).abs() +
-                                ((y as i32) - (to.1 as i32)).abs() == 3
-                        {
-                            possible_coords.push((x, y));
+                let possible_coords = [
+                    (to.0.checked_add(1), to.1.checked_add(2)),
+                    (to.0.checked_add(1), to.1.checked_sub(2)),
+                    (to.0.checked_sub(1), to.1.checked_add(2)),
+                    (to.0.checked_sub(1), to.1.checked_sub(2)),
+                    (to.0.checked_add(2), to.1.checked_add(1)),
+                    (to.0.checked_add(2), to.1.checked_sub(1)),
+                    (to.0.checked_sub(2), to.1.checked_add(1)),
+                    (to.0.checked_sub(2), to.1.checked_sub(1)),
+                ]
+                    .iter()
+                    .filter_map(|(x, y)| {
+                        match (x, y) {
+                            (Some(x), Some(y)) if *x < 8 && *y < 8 => Some((*x, *y)),
+                            _ => None,
                         }
-                    }
-                }
+                    })
+                    .collect::<Vec<(usize, usize)>>();
+                // can be optimized
                 let mut found = false;
                 for coords in possible_coords {
                     match self.pieces.get(&coords) {
                         Some(ref _piece @ Piece(PieceType::Knight, _color)) if _color == color => {
+                            println!("{:?} {:?}", coords_to_notation(coords), _piece);
                             found = true;
                             let knight = self.pieces.remove(&coords).unwrap();
                             self.pieces.insert(to, knight);
@@ -359,4 +367,10 @@ fn letter_to_column_index(letter: char) -> usize {
         panic!("How did we get here? I thought we checked this already.");
     }
     (letter as usize) - ('a' as usize)
+}
+
+fn coords_to_notation(coords: (usize, usize)) -> String {
+    let x = (coords.0 as u8) + ('a' as u8);
+    let y = (coords.1 as u8) + ('1' as u8);
+    format!("{}{}", x as char, y as char)
 }

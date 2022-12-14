@@ -31,6 +31,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn knight_moves() {
+        let commands = ["e4", "e5", "Nf3", "Nf6", "Nc3", "Nc6", "Nxe5", "Nxe4", "Nxe4"];
+        let expected_outputs = [
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+            Err(ChessError::InvalidMove),
+        ];
+        let mut game = Game::new();
+        for i in 0..7 {
+            println!("{i}");
+            let command = Command::parse(commands[i]).unwrap();
+            let result = game.next(command);
+            assert_eq!(result, expected_outputs[i]);
+        }
+    }
+
+    #[test]
     fn pawn_forward_capture() {
         let commands = ["e4", "e5", "exe5"];
         let expected_outputs = [Ok(()), Ok(()), Err(ChessError::InvalidMove)];
