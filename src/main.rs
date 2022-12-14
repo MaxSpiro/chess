@@ -1,20 +1,9 @@
-use std::io;
+use std::collections::HashMap;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum Color {
     White,
     Black,
-}
-
-#[derive(Copy, Clone, Debug)]
-struct Piece {
-    piece: PieceType,
-    coords: (usize, usize),
-}
-
-impl Piece {
-    fn from(piece: PieceType, coords: (usize, usize)) -> Self {
-        Self { piece, coords }
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -27,9 +16,12 @@ enum PieceType {
     Pawn,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Piece(PieceType, Color);
+
 struct Game {
     turn: Color,
-    pieces: [Vec<Piece>; 2],
+    pieces: HashMap<(usize, usize), Piece>,
 }
 
 #[derive(Debug)]
@@ -48,6 +40,21 @@ enum Special {
     Checkmate,
     // EnPassant,
     // Promotion,
+}
+
+#[derive(Debug)]
+enum ChessError {
+    InvalidMove,
+}
+
+impl std::error::Error for ChessError {}
+
+impl std::fmt::Display for ChessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ChessError::InvalidMove => write!(f, "Invalid move"),
+        }
+    }
 }
 
 impl Command {
@@ -192,71 +199,116 @@ impl Game {
         Game {
             turn: Color::White,
             pieces: [
-                vec![
-                    Piece::from(PieceType::Pawn, (0, 1)),
-                    Piece::from(PieceType::Pawn, (1, 1)),
-                    Piece::from(PieceType::Pawn, (2, 1)),
-                    Piece::from(PieceType::Pawn, (3, 1)),
-                    Piece::from(PieceType::Pawn, (4, 1)),
-                    Piece::from(PieceType::Pawn, (5, 1)),
-                    Piece::from(PieceType::Pawn, (6, 1)),
-                    Piece::from(PieceType::Pawn, (7, 1)),
-                    Piece::from(PieceType::Rook, (0, 0)),
-                    Piece::from(PieceType::Rook, (7, 0)),
-                    Piece::from(PieceType::Knight, (1, 0)),
-                    Piece::from(PieceType::Knight, (6, 0)),
-                    Piece::from(PieceType::Bishop, (2, 0)),
-                    Piece::from(PieceType::Bishop, (5, 0)),
-                    Piece::from(PieceType::Queen, (3, 0)),
-                    Piece::from(PieceType::King, (4, 0))
-                ],
-                vec![
-                    Piece::from(PieceType::Pawn, (0, 6)),
-                    Piece::from(PieceType::Pawn, (1, 6)),
-                    Piece::from(PieceType::Pawn, (2, 6)),
-                    Piece::from(PieceType::Pawn, (3, 6)),
-                    Piece::from(PieceType::Pawn, (4, 6)),
-                    Piece::from(PieceType::Pawn, (5, 6)),
-                    Piece::from(PieceType::Pawn, (6, 6)),
-                    Piece::from(PieceType::Pawn, (7, 6)),
-                    Piece::from(PieceType::Rook, (0, 7)),
-                    Piece::from(PieceType::Rook, (7, 7)),
-                    Piece::from(PieceType::Knight, (1, 7)),
-                    Piece::from(PieceType::Knight, (6, 7)),
-                    Piece::from(PieceType::Bishop, (2, 7)),
-                    Piece::from(PieceType::Bishop, (5, 7)),
-                    Piece::from(PieceType::Queen, (3, 7)),
-                    Piece::from(PieceType::King, (4, 7))
-                ],
-            ],
+                ((0, 0), Piece(PieceType::Rook, Color::White)),
+                ((1, 0), Piece(PieceType::Knight, Color::White)),
+                ((2, 0), Piece(PieceType::Bishop, Color::White)),
+                ((3, 0), Piece(PieceType::Queen, Color::White)),
+                ((4, 0), Piece(PieceType::King, Color::White)),
+                ((5, 0), Piece(PieceType::Bishop, Color::White)),
+                ((6, 0), Piece(PieceType::Knight, Color::White)),
+                ((7, 0), Piece(PieceType::Rook, Color::White)),
+                ((0, 1), Piece(PieceType::Pawn, Color::White)),
+                ((1, 1), Piece(PieceType::Pawn, Color::White)),
+                ((2, 1), Piece(PieceType::Pawn, Color::White)),
+                ((3, 1), Piece(PieceType::Pawn, Color::White)),
+                ((4, 1), Piece(PieceType::Pawn, Color::White)),
+                ((5, 1), Piece(PieceType::Pawn, Color::White)),
+                ((6, 1), Piece(PieceType::Pawn, Color::White)),
+                ((7, 1), Piece(PieceType::Pawn, Color::White)),
+                ((0, 7), Piece(PieceType::Rook, Color::Black)),
+                ((1, 7), Piece(PieceType::Knight, Color::Black)),
+                ((2, 7), Piece(PieceType::Bishop, Color::Black)),
+                ((3, 7), Piece(PieceType::Queen, Color::Black)),
+                ((4, 7), Piece(PieceType::King, Color::Black)),
+                ((5, 7), Piece(PieceType::Bishop, Color::Black)),
+                ((6, 7), Piece(PieceType::Knight, Color::Black)),
+                ((7, 7), Piece(PieceType::Rook, Color::Black)),
+                ((0, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((1, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((2, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((3, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((4, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((5, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((6, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((7, 6), Piece(PieceType::Pawn, Color::Black)),
+            ]
+                .iter()
+                .cloned()
+                .collect::<HashMap<(usize, usize), Piece>>(),
         }
     }
 
-    fn next(&mut self, input: Command) {
+    fn next(&mut self, input: Command) -> Result<(), ChessError> {
         let Command { to, piece, takes, .. } = input;
-        let index = if self.turn == Color::White { 0 } else { 1 };
-        let pieces = &self.pieces[index];
+        let Game { turn: color, .. } = self;
+        match self.pieces.get(&to) {
+            Some(_) => {
+                if !takes {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            None => {
+                if takes {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+        }
         match input.piece {
-            PieceType::Pawn => {}
+            PieceType::Pawn => {
+                let idx = |curr: usize, diff: usize| {
+                    match color {
+                        Color::White => curr - diff,
+                        Color::Black => curr + diff,
+                    }
+                };
+                if
+                    let Some(ref _piece @ Piece(PieceType::Pawn, _color)) = self.pieces.get(
+                        &(to.0, idx(to.1, 1))
+                    )
+                {
+                    let piece = self.pieces.remove(&(to.0, idx(to.1, 1))).unwrap();
+                    self.pieces.insert(to, piece);
+                } else if to.1 == (if *color == Color::White { 3 } else { 4 }) {
+                    if
+                        let Some(ref _piece @ Piece(PieceType::Pawn, _color)) = self.pieces.get(
+                            &(to.0, idx(to.1, 2))
+                        )
+                    {
+                        let piece = self.pieces.remove(&(to.0, idx(to.1, 2))).unwrap();
+                        self.pieces.insert(to, piece);
+                    } else {
+                        return Err(ChessError::InvalidMove);
+                    }
+                } else {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
             PieceType::Rook => {}
             PieceType::Bishop => {}
             PieceType::Knight => {}
             PieceType::King => {}
             PieceType::Queen => {}
         }
+
+        self.turn = match self.turn {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        };
+        Ok(())
     }
 }
 
 fn main() {
+    let mut chess = Game::new();
     let mut input = String::new();
-    let stdin = io::stdin();
     loop {
-        println!("What is your move?");
+        println!("It is {:?}'s turn, enter a move", &chess.turn);
 
-        match io::stdin().read_line(&mut input) {
+        match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
-                    println!("{:?}", command);
+                    let result = chess.next(command);
+                    println!("{:?}", result);
                 } else {
                     println!("Invalid move");
                 }
