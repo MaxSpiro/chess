@@ -85,21 +85,22 @@ impl Command {
         }
         let mut chars = input.chars();
         let piece;
+        let mut notation_index = 1;
         match chars.next().unwrap() {
+            'N' => {
+                piece = PieceType::Knight;
+            }
+            'R' => {
+                piece = PieceType::Rook;
+            }
             'K' => {
                 piece = PieceType::King;
             }
             'Q' => {
                 piece = PieceType::Queen;
             }
-            'R' => {
-                piece = PieceType::Rook;
-            }
             'B' => {
                 piece = PieceType::Bishop;
-            }
-            'N' => {
-                piece = PieceType::Knight;
             }
             col @ 'a'..='h' => {
                 piece = PieceType::Pawn;
@@ -154,10 +155,33 @@ impl Command {
                 return None;
             }
         }
+        if piece == PieceType::Knight || piece == PieceType::Rook {
+            let mut cloned = chars.clone();
+            let (next, next_next) = (cloned.next(), cloned.next());
+            if let Some(_char @ 'a'..='h') = next_next {
+                match next {
+                    Some(char @ 'a'..='h') => {
+                        from = Some((Some(letter_to_column_index(char)), None));
+                        chars.next();
+                        notation_index += 1;
+                    }
+                    Some(char @ '1'..='8') => {
+                        from = Some((None, Some((char.to_digit(10).unwrap() as usize) - 1)));
+                        chars.next();
+                        notation_index += 1;
+                    }
+                    _ => {}
+                }
+            }
+        }
         let (to, takes, last_char);
         match chars.next().unwrap() {
             'a'..='h' => {
-                if let Some(coords) = notation_to_coords(&input[1..=2]) {
+                if
+                    let Some(coords) = notation_to_coords(
+                        &input[notation_index..=notation_index + 1]
+                    )
+                {
                     to = coords;
                 } else {
                     return None;
@@ -166,7 +190,11 @@ impl Command {
                 last_char = chars.nth(1);
             }
             'x' => {
-                if let Some(coords) = notation_to_coords(&input[2..=3]) {
+                if
+                    let Some(coords) = notation_to_coords(
+                        &input[notation_index + 1..=notation_index + 2]
+                    )
+                {
                     to = coords;
                 } else {
                     return None;

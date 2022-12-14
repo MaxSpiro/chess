@@ -31,6 +31,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn multiple_options() {
+        let command = Command::parse("Nef3").unwrap();
+        assert_eq!(command.from, Some((Some(4), None)));
+
+        let command = Command::parse("N3h2").unwrap();
+        assert_eq!(command.from, Some((None, Some(2))));
+
+        let command = Command::parse("Rah2").unwrap();
+        assert_eq!(command.from, Some((Some(0), None)));
+
+        let command = Command::parse("R8g4").unwrap();
+        assert_eq!(command.from, Some((None, Some(7))))
+    }
+
+    #[test]
     fn multiple_knight_options() {
         let mut game = Game::new();
         let commands = ["e4", "e5", "Ne2", "d5"];
