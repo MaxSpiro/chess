@@ -31,6 +31,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn multiple_knight_options() {
+        let mut game = Game::new();
+        let commands = ["e4", "e5", "Ne2", "d5"];
+        for i in 0..3 {
+            let command = Command::parse(commands[i]).unwrap();
+            let result = game.next(command);
+            assert_eq!(result, Ok(()));
+        }
+        let possible1 = Command::parse("Nef3").unwrap();
+        let possible2 = Command::parse("Ngf3").unwrap();
+        let mut fork = game.clone();
+        let result1 = game.next(possible1);
+        let result2 = fork.next(possible2);
+        assert_eq!(result1, Ok(()));
+        assert_eq!(result2, Ok(()));
+    }
+
+    #[test]
     fn knight_moves() {
         let commands = ["e4", "e5", "Nf3", "Nf6", "Nc3", "Nc6", "Nxe5", "Nxe4", "Nxe4"];
         let expected_outputs = [
@@ -51,6 +69,12 @@ mod tests {
             let result = game.next(command);
             assert_eq!(result, expected_outputs[i]);
         }
+    }
+
+    #[test]
+    fn command_parse() {
+        let command = Command::parse("exd4");
+        println!("{:?}", command);
     }
 
     #[test]

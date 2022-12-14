@@ -19,6 +19,7 @@ pub enum PieceType {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Piece(PieceType, Color);
 
+#[derive(Clone)]
 pub struct Game {
     pub turn: Color,
     pub pieces: HashMap<(usize, usize), Piece>,
@@ -28,9 +29,9 @@ pub struct Game {
 pub struct Command {
     pub special: Option<Special>,
     pub piece: PieceType,
+    pub from: Option<(Option<usize>, Option<usize>)>,
     pub to: (usize, usize),
     pub takes: bool,
-    pub original: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -63,14 +64,14 @@ impl Command {
         if input.len() < 2 {
             return None;
         }
-        let original = input.to_string();
+        let mut from = None;
         if input == "O-O" {
             return Some(Self {
                 piece: PieceType::King,
                 to: (6, 0),
                 takes: false,
                 special: Some(Special::Castle),
-                original,
+                from,
             });
         }
         if input == "O-O-O" {
@@ -79,7 +80,7 @@ impl Command {
                 to: (2, 0),
                 takes: false,
                 special: Some(Special::LongCastle),
-                original,
+                from,
             });
         }
         let mut chars = input.chars();
@@ -100,8 +101,9 @@ impl Command {
             'N' => {
                 piece = PieceType::Knight;
             }
-            'a'..='h' => {
+            col @ 'a'..='h' => {
                 piece = PieceType::Pawn;
+                from = Some((Some(letter_to_column_index(col)), None));
                 let (to, last_char, takes);
                 match chars.next().unwrap() {
                     '1'..='8' => {
@@ -145,7 +147,7 @@ impl Command {
                     to,
                     takes,
                     special,
-                    original,
+                    from,
                 });
             }
             _ => {
@@ -195,7 +197,7 @@ impl Command {
             takes,
             piece,
             special,
-            original,
+            from,
         });
     }
 }
@@ -245,7 +247,7 @@ impl Game {
     }
 
     pub fn next(&mut self, input: Command) -> Result<(), ChessError> {
-        let Command { to, piece, takes, original, .. } = input;
+        let Command { to, from, piece, takes, .. } = input;
         let Game { turn: color, .. } = self;
         match self.pieces.get(&to) {
             Some(_) => {
@@ -270,14 +272,11 @@ impl Game {
                 // can be optimized
                 let mut possible_coords = vec![];
                 if takes {
-                    let column_index = letter_to_column_index(original.chars().next().unwrap());
-                    if (column_index as i32).abs_diff(to.0 as i32) != 1 {
+                    let from_col = from.unwrap().0.unwrap();
+                    if from_col.abs_diff(to.0) != 1 {
                         return Err(ChessError::InvalidMove);
                     }
-                    possible_coords.push((
-                        letter_to_column_index(original.chars().next().unwrap()),
-                        diff(to.1, 1),
-                    ));
+                    possible_coords.push((from_col, diff(to.1, 1)));
                 } else {
                     possible_coords.push((to.0, diff(to.1, 1)));
                     if
@@ -321,15 +320,14 @@ impl Game {
                         }
                     })
                     .collect::<Vec<(usize, usize)>>();
-                // can be optimized
                 let mut found = false;
                 for coords in possible_coords {
                     match self.pieces.get(&coords) {
                         Some(ref _piece @ Piece(PieceType::Knight, _color)) if _color == color => {
-                            println!("{:?} {:?}", coords_to_notation(coords), _piece);
                             found = true;
                             let knight = self.pieces.remove(&coords).unwrap();
                             self.pieces.insert(to, knight);
+                            break;
                         }
                         _ => {}
                     }
