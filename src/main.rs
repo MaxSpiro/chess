@@ -1,4 +1,4 @@
-use chess::{ Game, Command };
+use chess::{ Command, Game };
 
 fn main() {
     let mut chess = Game::new();
@@ -9,7 +9,7 @@ fn main() {
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
-                    let result = chess.next(command);
+                    let result = chess.play(command);
                     println!("{:?}", result);
                 } else {
                     println!("Invalid move");
@@ -26,199 +26,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use chess::{ ChessError, PieceType, Special };
+    use chess::{ ChessError, Color, GameState, Piece, PieceType, Special };
 
     use super::*;
-
-    #[test]
-    fn multiple_options() {
-        let command = Command::parse("Nef3").unwrap();
-        assert_eq!(command.from, Some((Some(4), None)));
-
-        let command = Command::parse("N3h2").unwrap();
-        assert_eq!(command.from, Some((None, Some(2))));
-
-        let command = Command::parse("Rah2").unwrap();
-        assert_eq!(command.from, Some((Some(0), None)));
-
-        let command = Command::parse("R8g4").unwrap();
-        assert_eq!(command.from, Some((None, Some(7))));
-
-        let command = Command::parse("R8xg4").unwrap();
-        assert_eq!(command.from, Some((None, Some(7))));
-        assert_eq!(command.takes, true)
-    }
-
-    #[test]
-    fn multiple_knight_options() {
-        let mut game = Game::new();
-        let commands = ["e4", "e5", "Ne2", "d5"];
-        for i in 0..4 {
-            let command = Command::parse(commands[i]).unwrap();
-            let result = game.next(command);
-            assert_eq!(result, Ok(()));
-        }
-        let mut fork = game.clone();
-        let possible1 = Command::parse("Nec3").unwrap();
-        let possible2 = Command::parse("Nbc3").unwrap();
-        let result1 = game.next(possible1);
-        let result2 = fork.next(possible2);
-        assert_eq!(result1, Ok(()));
-        assert_eq!(result2, Ok(()));
-    }
-
-    #[test]
-    fn knight_moves() {
-        let commands = ["e4", "e5", "Nf3", "Nf6", "Nc3", "Nc6", "Nxe5", "Nxe4", "Nxe4"];
-        let expected_outputs = [
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Err(ChessError::InvalidMove),
-        ];
-        let mut game = Game::new();
-        for i in 0..7 {
-            println!("{i}");
-            let command = Command::parse(commands[i]).unwrap();
-            let result = game.next(command);
-            assert_eq!(result, expected_outputs[i]);
-        }
-    }
-
-    #[test]
-    fn pawn_forward_capture() {
-        let commands = ["e4", "e5", "exe5"];
-        let expected_outputs = [Ok(()), Ok(()), Err(ChessError::InvalidMove)];
-        let mut game = Game::new();
-        for i in 0..3 {
-            let command = Command::parse(commands[i]).unwrap();
-            let result = game.next(command);
-            assert_eq!(result, expected_outputs[i]);
-        }
-    }
-
-    #[test]
-    fn pawn_moves() {
-        let mut game = Game::new();
-
-        let commands = [
-            "e4",
-            "e5",
-            "d4",
-            "d5",
-            "c3",
-            "c6",
-            "c4",
-            "c5",
-            "c5",
-            "h4",
-            "a3",
-            "a4",
-            "a5",
-        ];
-        let expected_outputs = [
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Err(ChessError::InvalidMove),
-            Ok(()),
-            Err(ChessError::InvalidMove),
-            Err(ChessError::InvalidMove),
-            Ok(()),
-        ];
-        for i in 0..13 {
-            let command = Command::parse(commands[i]).unwrap();
-            let result = game.next(command);
-            assert_eq!(result, expected_outputs[i]);
-        }
-
-        game = Game::new();
-        let commands = [
-            "e4",
-            "e5",
-            "d4",
-            "exd4",
-            "c3",
-            "dxc3",
-            "a2",
-            "a5",
-            "a4",
-            "b5",
-            "axb5",
-            "a3",
-            "a6",
-            "b6",
-        ];
-        let expected_outputs = [
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Ok(()),
-            Err(ChessError::InvalidMove),
-            Err(ChessError::InvalidMove),
-            Ok(()),
-            Ok(()),
-            Ok(()), // this errors for some reason
-            Err(ChessError::InvalidMove),
-            Ok(()),
-            Ok(()),
-        ];
-
-        for i in 0..13 {
-            let command = Command::parse(commands[i]).unwrap();
-            let result = game.next(command);
-            println!("{i}");
-            assert_eq!(result, expected_outputs[i]);
-        }
-    }
-
-    #[test]
-    fn basic_commands() {
-        let valid_commands = [
-            "e4",
-            "Rag8",
-            "N3f7",
-            "Nd5",
-            "dxc3",
-            "Kxa8",
-            "Be3+",
-            "O-O",
-            "O-O-O",
-            "Qxd4#",
-        ];
-        for command in valid_commands {
-            let command = Command::parse(command);
-            assert!(command.is_some());
-        }
-
-        let invalid_commandss = [
-            "aa4",
-            "e55",
-            "O-",
-            "O-O-O-O",
-            "Qxd44#",
-            "Qxd4+#",
-            "a",
-            "Qxd4x",
-            "Qxd4xQ",
-        ];
-        for command in invalid_commandss {
-            let command = Command::parse(command);
-            assert!(command.is_none());
-        }
-    }
 
     #[test]
     fn commands() {
@@ -280,15 +90,156 @@ mod tests {
         assert_eq!(command.takes, true);
         assert_eq!(command.special, Some(Special::Check));
 
-        assert!(Command::parse("aa4").is_none());
-        assert!(Command::parse("Bax7").is_none());
-        assert!(Command::parse("Rxh8+#").is_none());
-        assert!(Command::parse("a").is_none());
-        assert!(Command::parse("BRh8").is_none());
-        assert!(Command::parse("hB8").is_none());
-        assert!(Command::parse("axd9").is_none());
-        assert!(Command::parse("Bj9").is_none());
-        assert!(Command::parse("Ld8").is_none());
-        assert!(Command::parse("4a").is_none());
+        let command = Command::parse("Rexa8#").unwrap();
+        assert_eq!(command.from, Some((Some(4), None)));
+        assert_eq!(command.takes, true);
+        assert_eq!(command.special, Some(Special::Checkmate));
+
+        let invalid_commands = [
+            "aa4",
+            "e55",
+            "O-",
+            "O-O-O-O",
+            "Qxd44#",
+            "Qxd4+#",
+            "a",
+            "Qxd4x",
+            "Qxd4xQ",
+            "aa4",
+            "Bax7",
+            "Rxh8+#",
+            "a",
+            "BRh8",
+            "hB8",
+            "axd9",
+            "Bj9",
+            "Ld8",
+            "4a",
+        ];
+        for command in invalid_commands {
+            assert!(Command::parse(command).is_none());
+        }
+
+        let valid_commands = [
+            "e4",
+            "Rag8",
+            "N3f7",
+            "Nd5",
+            "dxc3",
+            "Kxa8",
+            "Be3+",
+            "O-O",
+            "O-O-O",
+            "Qxd4#",
+        ];
+        for command in valid_commands {
+            assert!(Command::parse(command).is_some());
+        }
+    }
+
+    #[test]
+    fn ruy_lopez() {
+        let mut chess = Game::new();
+        let moves = [
+            "e4",
+            "e5",
+            "Nf3",
+            "Nc6",
+            "Bb5",
+            "a6",
+            "Ba4",
+            "Nf6",
+            "O-O",
+            "Be7",
+            "Re1",
+            "b5",
+            "Bb3",
+            "O-O",
+            "c3",
+            "d5",
+        ];
+
+        for command in moves {
+            println!("{:?}: {}", chess.turn, command);
+            chess.play(Command::parse(command).unwrap()).unwrap();
+        }
+
+        let coords = [
+            (0, 5),
+            (1, 2),
+            (1, 4),
+            (2, 2),
+            (2, 5),
+            (3, 4),
+            (4, 3),
+            (4, 4),
+            (4, 6),
+            (5, 5),
+            (4, 0),
+            (6, 0),
+            (5, 7),
+            (6, 7),
+        ];
+        let pieces = [
+            Piece::new(PieceType::Pawn, Color::Black),
+            Piece::new(PieceType::Bishop, Color::White),
+            Piece::new(PieceType::Pawn, Color::Black),
+            Piece::new(PieceType::Pawn, Color::White),
+            Piece::new(PieceType::Knight, Color::Black),
+            Piece::new(PieceType::Pawn, Color::Black),
+            Piece::new(PieceType::Pawn, Color::White),
+            Piece::new(PieceType::Pawn, Color::Black),
+            Piece::new(PieceType::Bishop, Color::Black),
+            Piece::new(PieceType::Knight, Color::Black),
+            Piece::new(PieceType::Rook, Color::White),
+            Piece::new(PieceType::King, Color::White),
+            Piece::new(PieceType::Rook, Color::Black),
+            Piece::new(PieceType::King, Color::Black),
+        ];
+
+        for (coord, piece) in coords.iter().zip(pieces.iter()) {
+            assert_eq!(chess.pieces.get(coord), Some(piece));
+        }
+    }
+
+    #[test]
+    fn bongcloud() {
+        let mut chess = Game::new();
+        let result = chess.play(Command::parse("e4").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("e5").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Ke2").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Ke7").unwrap());
+        assert_eq!(result, Ok(()));
+
+        assert_eq!(chess.pieces.get(&(4, 4)), Some(&Piece::new(PieceType::Pawn, Color::Black)));
+        assert_eq!(chess.pieces.get(&(4, 1)), Some(&Piece::new(PieceType::King, Color::White)));
+        assert_eq!(chess.pieces.get(&(4, 6)), Some(&Piece::new(PieceType::King, Color::Black)));
+    }
+
+    #[test]
+    fn fried_liver() {
+        let mut chess = Game::new();
+        let result = chess.play(Command::parse("e4").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("e5").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Qh5").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Nc6").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Bc4").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Nf6").unwrap());
+        assert_eq!(result, Ok(()));
+        let result = chess.play(Command::parse("Qxf7#").unwrap());
+        assert_eq!(result, Ok(()));
+
+        assert_eq!(chess.pieces.get(&(5, 6)), Some(&Piece::new(PieceType::Queen, Color::White)));
+        assert_eq!(chess.pieces.get(&(2, 3)), Some(&Piece::new(PieceType::Bishop, Color::White)));
+
+        assert_eq!(chess.state, GameState::Checkmate(Color::White));
     }
 }

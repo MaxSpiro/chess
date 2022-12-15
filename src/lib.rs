@@ -17,12 +17,27 @@ pub enum PieceType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GameState {
+    InProgress,
+    Checkmate(Color),
+    Check(Color),
+    Stalemate,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Piece(PieceType, Color);
+
+impl Piece {
+    pub fn new(piece_type: PieceType, color: Color) -> Self {
+        Self(piece_type, color)
+    }
+}
 
 #[derive(Clone)]
 pub struct Game {
     pub turn: Color,
     pub pieces: HashMap<(usize, usize), Piece>,
+    pub state: GameState,
 }
 
 #[derive(Debug)]
@@ -59,8 +74,8 @@ impl std::fmt::Display for ChessError {
     }
 }
 
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 impl Command {
     pub fn parse(input: &str) -> Option<Self> {
@@ -127,13 +142,12 @@ impl Command {
         }
         let to = captures.name("to").unwrap().as_str();
         let check = match captures.name("check") {
-            Some(check) => {
+            Some(check) =>
                 match check.as_str() {
                     "+" => Some(Special::Check),
                     "#" => Some(Special::Checkmate),
                     _ => None,
                 }
-            }
             _ => None,
         };
         return Some(Self {
@@ -191,12 +205,58 @@ impl Game {
                 .iter()
                 .cloned()
                 .collect::<HashMap<(usize, usize), Piece>>(),
+            state: GameState::InProgress,
         }
     }
 
-    pub fn next(&mut self, input: Command) -> Result<(), ChessError> {
-        let Command { to, from, piece, takes, .. } = input;
+    pub fn play(&mut self, input: Command) -> Result<(), ChessError> {
+        let Command { to, from, piece, takes, special } = input;
         let Game { turn: color, .. } = self;
+        match special {
+            Some(castle @ Special::LongCastle | castle @ Special::Castle) => {
+                if piece != PieceType::King {
+                    return Err(ChessError::InvalidMove);
+                }
+                let rook_col = match castle {
+                    Special::LongCastle => 0,
+                    Special::Castle => 7,
+                    _ => unreachable!(),
+                };
+                let home_row = match color {
+                    Color::White => 0,
+                    Color::Black => 7,
+                };
+                let (from_king, from_rook) = ((4, home_row), (rook_col, home_row));
+                if self.pieces.get(&from_king).is_none() || self.pieces.get(&from_rook).is_none() {
+                    return Err(ChessError::InvalidMove);
+                }
+                let (to_king, to_rook) = match castle {
+                    Special::LongCastle => ((2, home_row), (3, home_row)),
+                    Special::Castle => ((6, home_row), (5, home_row)),
+                    _ => unreachable!(),
+                };
+                if self.pieces.get(&to_king).is_some() || self.pieces.get(&to_rook).is_some() {
+                    return Err(ChessError::InvalidMove);
+                }
+                let range = match castle {
+                    Special::LongCastle => 1..4,
+                    Special::Castle => 5..7,
+                    _ => unreachable!(),
+                };
+                for col in range {
+                    if self.pieces.get(&(col, home_row)).is_some() {
+                        return Err(ChessError::InvalidMove);
+                    }
+                }
+                let king = self.pieces.remove(&from_king).unwrap();
+                let rook = self.pieces.remove(&from_rook).unwrap();
+                self.pieces.insert(to_king, king);
+                self.pieces.insert(to_rook, rook);
+                self.next_turn();
+                return Ok(());
+            }
+            _ => {}
+        }
         match self.pieces.get(&to) {
             Some(_) => {
                 if !takes {
@@ -288,17 +348,169 @@ impl Game {
                 }
             }
             PieceType::Rook => {
-                
+                let directions = [
+                    (1, 0),
+                    (-1, 0),
+                    (0, 1),
+                    (0, -1),
+                ];
+                let mut found = false;
+                'all_directions: for direction in directions {
+                    let mut i = 0;
+                    'inner: loop {
+                        let coords = match next_coords(to, direction, i) {
+                            Some(coords) => coords,
+                            None => {
+                                break 'inner;
+                            }
+                        };
+                        match self.pieces.get(&coords) {
+                            Some(ref _piece @ Piece(PieceType::Rook, _color)) if _color == color => {
+                                found = true;
+                                let rook = self.pieces.remove(&coords).unwrap();
+                                self.pieces.insert(to, rook);
+                                break 'all_directions;
+                            }
+                            Some(_) => {
+                                break 'inner;
+                            }
+                            None => {}
+                        }
+                        i += 1;
+                    }
+                }
+                if !found {
+                    return Err(ChessError::InvalidMove);
+                }
             }
-            PieceType::Bishop => {}
-            PieceType::King => {}
-            PieceType::Queen => {}
+            PieceType::Bishop => {
+                let directions = [
+                    (1, 1),
+                    (1, -1),
+                    (-1, 1),
+                    (-1, -1),
+                ];
+                let mut found = false;
+                'all_directions: for direction in directions {
+                    let mut i = 0;
+                    'inner: loop {
+                        let coords = match next_coords(to, direction, i) {
+                            Some(coords) => coords,
+                            None => {
+                                break 'inner;
+                            }
+                        };
+                        match self.pieces.get(&coords) {
+                            Some(ref _piece @ Piece(PieceType::Bishop, _color)) if
+                                _color == color
+                            => {
+                                found = true;
+                                let bishop = self.pieces.remove(&coords).unwrap();
+                                self.pieces.insert(to, bishop);
+                                break 'all_directions;
+                            }
+                            Some(_) => {
+                                break 'inner;
+                            }
+                            None => {}
+                        }
+                        i += 1;
+                    }
+                }
+                if !found {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            PieceType::King => {
+                let possible_coords = [
+                    (to.0.checked_add(1), to.1.checked_add(1)),
+                    (to.0.checked_add(1), to.1.checked_sub(1)),
+                    (to.0.checked_sub(1), to.1.checked_add(1)),
+                    (to.0.checked_sub(1), to.1.checked_sub(1)),
+                    (to.0.checked_add(1), Some(to.1)),
+                    (to.0.checked_sub(1), Some(to.1)),
+                    (Some(to.0), to.1.checked_add(1)),
+                    (Some(to.0), to.1.checked_sub(1)),
+                ]
+                    .iter()
+                    .filter_map(|(x, y)| {
+                        match (x, y) {
+                            (Some(x), Some(y)) if *x < 8 && *y < 8 => Some((*x, *y)),
+                            _ => None,
+                        }
+                    })
+                    .collect::<Vec<(usize, usize)>>();
+                let mut found = false;
+                for coords in possible_coords {
+                    match self.pieces.get(&coords) {
+                        Some(ref _piece @ Piece(PieceType::King, _color)) if
+                            _color == color &&
+                            coords_match_from(coords, from)
+                        => {
+                            found = true;
+                            let king = self.pieces.remove(&coords).unwrap();
+                            self.pieces.insert(to, king);
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+                if !found {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            PieceType::Queen => {
+                let directions = [
+                    (1, 1),
+                    (1, -1),
+                    (-1, 1),
+                    (-1, -1),
+                    (1, 0),
+                    (-1, 0),
+                    (0, 1),
+                    (0, -1),
+                ];
+                let mut found = false;
+                'all_directions: for direction in directions {
+                    let mut i = 0;
+                    'inner: loop {
+                        let coords = match next_coords(to, direction, i) {
+                            Some(coords) => coords,
+                            None => {
+                                break 'inner;
+                            }
+                        };
+                        match self.pieces.get(&coords) {
+                            Some(ref _piece @ Piece(PieceType::Queen, _color)) if
+                                _color == color
+                            => {
+                                found = true;
+                                let queen = self.pieces.remove(&coords).unwrap();
+                                self.pieces.insert(to, queen);
+                                break 'all_directions;
+                            }
+                            Some(_) => {
+                                break 'inner;
+                            }
+                            None => {}
+                        }
+                        i += 1;
+                    }
+                }
+                if !found {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
         }
+        self.next_turn();
+        Ok(())
+    }
+
+    fn next_turn(&mut self) {
         self.turn = match self.turn {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
-        Ok(())
     }
 }
 
@@ -327,11 +539,46 @@ fn coords_to_notation(coords: (usize, usize)) -> String {
 }
 
 fn coords_match_from(coords: (usize, usize), from: Option<(Option<usize>, Option<usize>)>) -> bool {
-    let b = match from {
+    match from {
         Some((Some(x), None)) => coords.0 == x,
         Some((None, Some(y))) => coords.1 == y,
         _ => true,
-    };
-    println!("{} {} {:?} {}", coords.0, coords.1, from, b);
-    b
+    }
+}
+
+fn next_coords(
+    origin: (usize, usize),
+    direction: (isize, isize),
+    step: isize
+) -> Option<(usize, usize)> {
+    let x =
+        (origin.0 as isize) +
+        (direction.0 +
+            (
+                (if direction.0 < 0 {
+                    -1 * step
+                } else if direction.0 > 0 {
+                    step
+                } else {
+                    0
+                }) as isize
+            ));
+    let y =
+        (origin.1 as isize) +
+        (direction.1 +
+            (
+                (if direction.1 < 0 {
+                    -1 * step
+                } else if direction.1 > 0 {
+                    step
+                } else {
+                    0
+                }) as isize
+            ));
+
+    let (x, y) = (x.try_into(), y.try_into());
+    match (x, y) {
+        (Ok(x @ 0..=7), Ok(y @ 0..=7)) => Some((x, y)),
+        _ => None,
+    }
 }
