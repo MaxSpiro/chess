@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(command.special, Some(Special::Check));
 
         let command = Command::parse("Rexa8#").unwrap();
-        assert_eq!(command.from, Some((Some(4), None)));
+        assert_eq!(command.from, (Some(4), None));
         assert_eq!(command.takes, true);
         assert_eq!(command.special, Some(Special::Checkmate));
 
@@ -115,6 +115,7 @@ mod tests {
             "Bj9",
             "Ld8",
             "4a",
+            "Ka8xh7=Q+",
         ];
         for command in invalid_commands {
             assert!(Command::parse(command).is_none());

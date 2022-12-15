@@ -44,7 +44,7 @@ pub struct Game {
 pub struct Command {
     pub special: Option<Special>,
     pub piece: PieceType,
-    pub from: Option<(Option<usize>, Option<usize>)>,
+    pub from: (Option<usize>, Option<usize>),
     pub to: (usize, usize),
     pub takes: bool,
 }
@@ -90,7 +90,7 @@ impl Command {
         let captures = NOTATION_PATTERN.captures(input)?;
         if input == "O-O" {
             return Some(Self {
-                from: None,
+                from: (None, None),
                 piece: PieceType::King,
                 special: Some(Special::Castle),
                 takes: false,
@@ -99,7 +99,7 @@ impl Command {
         }
         if input == "O-O-O" {
             return Some(Self {
-                from: None,
+                from: (None, None),
                 piece: PieceType::King,
                 special: Some(Special::LongCastle),
                 takes: false,
@@ -120,14 +120,15 @@ impl Command {
                 }
             None => PieceType::Pawn,
         };
-        let from_col = match captures.name("from_col") {
-            Some(from_col) =>
-                Some(letter_to_column_index(from_col.as_str().chars().next().unwrap())),
-            None => None,
+        let from_col = if let Some(from_col) = captures.name("from_col") {
+            Some(letter_to_column_index(from_col.as_str().chars().next().unwrap()))
+        } else {
+            None
         };
-        let from_row = match captures.name("from_row") {
-            Some(from_row) => Some(from_row.as_str().parse::<usize>().unwrap() - 1),
-            None => None,
+        let from_row = if let Some(from_row) = captures.name("from_row") {
+            Some(from_row.as_str().parse::<usize>().unwrap() - 1)
+        } else {
+            None
         };
         let takes = captures.name("takes").is_some();
         if from_row.is_some() || from_col.is_some() {
@@ -141,21 +142,18 @@ impl Command {
             }
         }
         let to = captures.name("to").unwrap().as_str();
-        let check = match captures.name("check") {
-            Some(check) =>
-                match check.as_str() {
-                    "+" => Some(Special::Check),
-                    "#" => Some(Special::Checkmate),
-                    _ => None,
-                }
-            _ => None,
+        let check = if let Some(check) = captures.name("check") {
+            match check.as_str() {
+                "+" => Some(Special::Check),
+                "#" => Some(Special::Checkmate),
+                _ => None,
+            }
+        } else {
+            None
         };
+
         return Some(Self {
-            from: if from_col.is_some() || from_row.is_some() {
-                Some((from_col, from_row))
-            } else {
-                None
-            },
+            from: (from_col, from_row),
             piece,
             takes,
             to: notation_to_coords(to).unwrap(),
@@ -273,6 +271,7 @@ impl Game {
         let mut possible_coords: Option<Vec<(usize, usize)>> = None;
         match input.piece {
             PieceType::Pawn => {
+                // todo refactor i dont like this
                 let diff = |curr: usize, diff: usize| {
                     match color {
                         Color::White => curr - diff,
@@ -281,7 +280,7 @@ impl Game {
                 };
                 let mut coords = vec![];
                 if takes {
-                    let from_col = from.unwrap().0.unwrap();
+                    let from_col = from.0.unwrap();
                     if from_col.abs_diff(to.0) != 1 {
                         return Err(ChessError::InvalidMove);
                     }
@@ -316,7 +315,7 @@ impl Game {
                                 _ => None,
                             }
                         })
-                        .collect::<Vec<(usize, usize)>>()
+                        .collect()
                 );
             }
             PieceType::Rook => {
@@ -344,7 +343,7 @@ impl Game {
                                 _ => None,
                             }
                         })
-                        .collect::<Vec<(usize, usize)>>()
+                        .collect()
                 );
             }
             PieceType::Queen => {
@@ -383,8 +382,7 @@ impl Game {
                     i += 1;
                 }
             }
-        }
-        if let Some(possible_coords) = possible_coords {
+        } else if let Some(possible_coords) = possible_coords {
             for coords in possible_coords {
                 match self.pieces.get(&coords) {
                     Some(ref _piece @ Piece(_piecetype, _color)) if
@@ -400,6 +398,8 @@ impl Game {
                     _ => {}
                 }
             }
+        } else {
+            return Err(ChessError::InvalidMove);
         }
         if !piece_found {
             return Err(ChessError::InvalidMove);
@@ -441,10 +441,11 @@ fn coords_to_notation(coords: (usize, usize)) -> String {
     format!("{}{}", x as char, y as char)
 }
 
-fn coords_match_from(coords: (usize, usize), from: Option<(Option<usize>, Option<usize>)>) -> bool {
+fn coords_match_from(coords: (usize, usize), from: (Option<usize>, Option<usize>)) -> bool {
     match from {
-        Some((Some(x), None)) => coords.0 == x,
-        Some((None, Some(y))) => coords.1 == y,
+        (Some(x), None) => coords.0 == x,
+        (None, Some(y)) => coords.1 == y,
+        (Some(x), Some(y)) => coords.0 == x && coords.1 == y,
         _ => true,
     }
 }
