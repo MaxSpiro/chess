@@ -40,8 +40,8 @@ pub enum Special {
     LongCastle,
     Check,
     Checkmate,
-    // EnPassant,
-    // Promotion,
+    EnPassant,
+    Promotion,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -67,7 +67,6 @@ impl Command {
         if input.len() < 2 {
             return None;
         }
-        println!("Parsing: {}", input);
         lazy_static! {
             static ref NOTATION_PATTERN: Regex = Regex::new(
                 r"^(?P<piece>[NBRQK])?(?P<from_col>[a-h])?(?P<from_row>[1-8])?(?P<takes>x)?(?P<to>[a-h][1-8])(?P<promotion>=[NBRQK])?(?P<check>\+|#)?$|^(?P<castle>O-O|O-O-O)?$"
@@ -117,10 +116,12 @@ impl Command {
         };
         let takes = captures.name("takes").is_some();
         if from_row.is_some() || from_col.is_some() {
-            if piece != PieceType::Knight && piece != PieceType::Rook && piece != PieceType::Pawn {
-                return None;
-            }
-            if piece == PieceType::Pawn && !takes {
+            if
+                (piece != PieceType::Knight &&
+                    piece != PieceType::Rook &&
+                    piece != PieceType::Pawn) ||
+                (!takes && piece == PieceType::Pawn)
+            {
                 return None;
             }
         }
@@ -142,9 +143,9 @@ impl Command {
                 None
             },
             piece,
-            special: check,
             takes,
             to: notation_to_coords(to).unwrap(),
+            special: check,
         });
     }
 }
@@ -270,7 +271,10 @@ impl Game {
                 let mut found = false;
                 for coords in possible_coords {
                     match self.pieces.get(&coords) {
-                        Some(ref _piece @ Piece(PieceType::Knight, _color)) if _color == color => {
+                        Some(ref _piece @ Piece(PieceType::Knight, _color)) if
+                            _color == color &&
+                            coords_match_from(coords, from)
+                        => {
                             found = true;
                             let knight = self.pieces.remove(&coords).unwrap();
                             self.pieces.insert(to, knight);
@@ -283,7 +287,9 @@ impl Game {
                     return Err(ChessError::InvalidMove);
                 }
             }
-            PieceType::Rook => {}
+            PieceType::Rook => {
+                
+            }
             PieceType::Bishop => {}
             PieceType::King => {}
             PieceType::Queen => {}
@@ -318,4 +324,14 @@ fn coords_to_notation(coords: (usize, usize)) -> String {
     let x = (coords.0 as u8) + ('a' as u8);
     let y = (coords.1 as u8) + ('1' as u8);
     format!("{}{}", x as char, y as char)
+}
+
+fn coords_match_from(coords: (usize, usize), from: Option<(Option<usize>, Option<usize>)>) -> bool {
+    let b = match from {
+        Some((Some(x), None)) => coords.0 == x,
+        Some((None, Some(y))) => coords.1 == y,
+        _ => true,
+    };
+    println!("{} {} {:?} {}", coords.0, coords.1, from, b);
+    b
 }
