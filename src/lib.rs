@@ -59,173 +59,92 @@ impl std::fmt::Display for ChessError {
     }
 }
 
+use regex::Regex;
+use lazy_static::lazy_static;
+
 impl Command {
     pub fn parse(input: &str) -> Option<Self> {
         if input.len() < 2 {
             return None;
         }
-        let mut from = None;
+        println!("Parsing: {}", input);
+        lazy_static! {
+            static ref NOTATION_PATTERN: Regex = Regex::new(
+                r"^(?P<piece>[NBRQK])?(?P<from_col>[a-h])?(?P<from_row>[1-8])?(?P<takes>x)?(?P<to>[a-h][1-8])(?P<promotion>=[NBRQK])?(?P<check>\+|#)?$|^(?P<castle>O-O|O-O-O)?$"
+            ).unwrap();
+        }
+        let captures = NOTATION_PATTERN.captures(input)?;
         if input == "O-O" {
             return Some(Self {
+                from: None,
                 piece: PieceType::King,
-                to: (6, 0),
-                takes: false,
                 special: Some(Special::Castle),
-                from,
+                takes: false,
+                to: (0, 0),
             });
         }
         if input == "O-O-O" {
             return Some(Self {
+                from: None,
                 piece: PieceType::King,
-                to: (2, 0),
-                takes: false,
                 special: Some(Special::LongCastle),
-                from,
+                takes: false,
+                to: (0, 0),
             });
         }
-        let mut chars = input.chars();
-        let piece;
-        let mut notation_index = 1;
-        match chars.next().unwrap() {
-            'N' => {
-                piece = PieceType::Knight;
-            }
-            'R' => {
-                piece = PieceType::Rook;
-            }
-            'K' => {
-                piece = PieceType::King;
-            }
-            'Q' => {
-                piece = PieceType::Queen;
-            }
-            'B' => {
-                piece = PieceType::Bishop;
-            }
-            col @ 'a'..='h' => {
-                piece = PieceType::Pawn;
-                from = Some((Some(letter_to_column_index(col)), None));
-                let (to, last_char, takes);
-                match chars.next().unwrap() {
-                    '1'..='8' => {
-                        if let Some(coords) = notation_to_coords(&input[0..=1]) {
-                            to = coords;
-                        } else {
-                            return None;
-                        }
-                        last_char = chars.next();
-                        takes = false;
-                    }
-                    'x' => {
-                        if let Some(coords) = notation_to_coords(&input[2..=3]) {
-                            to = coords;
-                        } else {
-                            return None;
-                        }
-                        last_char = chars.nth(2);
-                        takes = true;
-                    }
-                    c => {
+        let piece = match captures.name("piece") {
+            Some(piece) =>
+                match piece.as_str() {
+                    "N" => PieceType::Knight,
+                    "B" => PieceType::Bishop,
+                    "R" => PieceType::Rook,
+                    "Q" => PieceType::Queen,
+                    "K" => PieceType::King,
+                    _ => {
                         return None;
                     }
                 }
-                let special = if let Some(str) = last_char {
-                    match str {
-                        '+' => { Some(Special::Check) }
-                        '#' => { Some(Special::Checkmate) }
-                        _ => {
-                            return None;
-                        }
-                    }
-                } else {
-                    None
-                };
-                if special.is_some() && chars.next().is_some() {
-                    return None;
-                }
-                return Some(Self {
-                    piece,
-                    to,
-                    takes,
-                    special,
-                    from,
-                });
-            }
-            _ => {
-                return None;
-            }
-        }
-        if piece == PieceType::Knight || piece == PieceType::Rook {
-            let mut cloned = chars.clone();
-            let (next, next_next) = (cloned.next(), cloned.next());
-            if let Some(_char @ 'a'..='h') = next_next {
-                match next {
-                    Some(char @ 'a'..='h') => {
-                        from = Some((Some(letter_to_column_index(char)), None));
-                        chars.next();
-                        notation_index += 1;
-                    }
-                    Some(char @ '1'..='8') => {
-                        from = Some((None, Some((char.to_digit(10).unwrap() as usize) - 1)));
-                        chars.next();
-                        notation_index += 1;
-                    }
-                    _ => {}
-                }
-            }
-        }
-        let (to, takes, last_char);
-        match chars.next().unwrap() {
-            'a'..='h' => {
-                if
-                    let Some(coords) = notation_to_coords(
-                        &input[notation_index..=notation_index + 1]
-                    )
-                {
-                    to = coords;
-                } else {
-                    return None;
-                }
-                takes = false;
-                last_char = chars.nth(1);
-            }
-            'x' => {
-                if
-                    let Some(coords) = notation_to_coords(
-                        &input[notation_index + 1..=notation_index + 2]
-                    )
-                {
-                    to = coords;
-                } else {
-                    return None;
-                }
-                takes = true;
-                last_char = chars.nth(2);
-            }
-            _ => {
-                return None;
-            }
-        }
-        let special = if let Some(str) = last_char {
-            match str {
-                '+' => { Some(Special::Check) }
-                '#' => { Some(Special::Checkmate) }
-                _ => {
-                    return None;
-                }
-            }
-        } else {
-            None
+            None => PieceType::Pawn,
         };
-        if special.is_some() && chars.next().is_some() {
-            return None;
+        let from_col = match captures.name("from_col") {
+            Some(from_col) =>
+                Some(letter_to_column_index(from_col.as_str().chars().next().unwrap())),
+            None => None,
+        };
+        let from_row = match captures.name("from_row") {
+            Some(from_row) => Some(from_row.as_str().parse::<usize>().unwrap() - 1),
+            None => None,
+        };
+        let takes = captures.name("takes").is_some();
+        if from_row.is_some() || from_col.is_some() {
+            if piece != PieceType::Knight && piece != PieceType::Rook && piece != PieceType::Pawn {
+                return None;
+            }
+            if piece == PieceType::Pawn && !takes {
+                return None;
+            }
         }
+        let to = captures.name("to").unwrap().as_str();
+        let check = match captures.name("check") {
+            Some(check) => {
+                match check.as_str() {
+                    "+" => Some(Special::Check),
+                    "#" => Some(Special::Checkmate),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
         return Some(Self {
-            to,
-            takes,
+            from: if from_col.is_some() || from_row.is_some() {
+                Some((from_col, from_row))
+            } else {
+                None
+            },
             piece,
-            special,
-            from,
+            special: check,
+            takes,
+            to: notation_to_coords(to).unwrap(),
         });
     }
 }

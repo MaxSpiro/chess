@@ -42,7 +42,11 @@ mod tests {
         assert_eq!(command.from, Some((Some(0), None)));
 
         let command = Command::parse("R8g4").unwrap();
-        assert_eq!(command.from, Some((None, Some(7))))
+        assert_eq!(command.from, Some((None, Some(7))));
+
+        let command = Command::parse("R8xg4").unwrap();
+        assert_eq!(command.from, Some((None, Some(7))));
+        assert_eq!(command.takes, true)
     }
 
     #[test]
@@ -183,6 +187,42 @@ mod tests {
             let result = game.next(command);
             println!("{i}");
             assert_eq!(result, expected_outputs[i]);
+        }
+    }
+
+    #[test]
+    fn basic_commands() {
+        let valid_commands = [
+            "e4",
+            "Rag8",
+            "N3f7",
+            "Nd5",
+            "dxc3",
+            "Kxa8",
+            "Be3+",
+            "O-O",
+            "O-O-O",
+            "Qxd4#",
+        ];
+        for command in valid_commands {
+            let command = Command::parse(command);
+            assert!(command.is_some());
+        }
+
+        let invalid_commandss = [
+            "aa4",
+            "e55",
+            "O-",
+            "O-O-O-O",
+            "Qxd44#",
+            "Qxd4+#",
+            "a",
+            "Qxd4x",
+            "Qxd4xQ",
+        ];
+        for command in invalid_commandss {
+            let command = Command::parse(command);
+            assert!(command.is_none());
         }
     }
 
