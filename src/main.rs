@@ -267,6 +267,30 @@ mod tests {
     }
 
     #[test]
+    fn castle_to_check() {
+        let mut game = Game::new();
+        let moves = [
+            "e4",
+            "f5",
+            "exf5",
+            "Nc6",
+            "Nf3",
+            "a6",
+            "Bc4",
+            "a5",
+            "O-O",
+            "e5",
+            "d4",
+            "exd4",
+            "Re1+",
+        ];
+        for command in moves {
+            game.play(Command::parse(command).unwrap()).unwrap();
+        }
+        assert!(game.is_check(Color::Black));
+    }
+
+    #[test]
     fn bongcloud() {
         let mut chess = Game::new();
         let result = chess.play(Command::parse("e4").unwrap());

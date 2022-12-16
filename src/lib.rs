@@ -418,11 +418,7 @@ impl Game {
 
         if self.is_check(other_color) {
             println!("Check! {:?}", self.is_check(other_color));
-            if let Some(Special::Check | Special::Checkmate) = special {
-                self.state = GameState::Check(other_color);
-            } else {
-                return Err(ChessError::InvalidMove);
-            }
+            self.state = GameState::Check(other_color);
         }
         self.next_turn();
         Ok(())
