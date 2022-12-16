@@ -25,12 +25,14 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use chess::{ ChessError, Color, GameState, Piece, PieceType, Special };
 
     use super::*;
 
     #[test]
-    fn commands() {
+    fn commands_can_parse() {
         let command = Command::parse("Kd4").unwrap();
         assert_eq!(command.piece, PieceType::King);
         assert_eq!(command.to, (3, 3));
@@ -138,16 +140,70 @@ mod tests {
     }
 
     #[test]
-    fn check() {
-        let mut chess = Game::new();
-        let moves = ["e4", "e5", "Qh5", "Nc6", "Qxf7+"];
-        for command in moves {
-            println!("{} ", command);
-            chess.play(Command::parse(command).unwrap()).unwrap();
-        }
-        assert_eq!(chess.pieces.get(&(5, 6)), Some(&Piece::new(PieceType::Queen, Color::White)));
-        assert_eq!(chess.pieces.get(&(4, 7)), Some(&Piece::new(PieceType::King, Color::Black)));
-        assert!(chess.is_check(Color::Black))
+    fn all_pieces_can_check() {
+        let mut chess = Game {
+            turn: Color::White,
+            state: GameState::InProgress,
+            pieces: vec![
+                ((4, 4), Piece::new(PieceType::King, Color::White)),
+                ((5, 5), Piece::new(PieceType::Queen, Color::Black))
+            ]
+                .into_iter()
+                .collect(),
+        };
+        assert!(chess.is_check(Color::White));
+
+        chess.pieces.remove(&(5, 5));
+        chess.pieces.insert((7, 6), Piece::new(PieceType::Queen, Color::Black));
+        assert!(!chess.is_check(Color::White));
+
+        chess.pieces.remove(&(7, 6));
+        chess.pieces.insert((0, 4), Piece::new(PieceType::Queen, Color::Black));
+        assert!(chess.is_check(Color::White));
+
+        chess.pieces.remove(&(0, 4));
+        chess.pieces.insert((4, 0), Piece::new(PieceType::Queen, Color::Black));
+        assert!(chess.is_check(Color::White));
+
+        chess.pieces.remove(&(4, 0));
+        chess.pieces.insert((5, 5), Piece::new(PieceType::Pawn, Color::Black));
+        assert!(chess.is_check(Color::White));
+
+        chess.pieces.remove(&(5, 5));
+        chess.pieces.insert((3, 5), Piece::new(PieceType::Pawn, Color::Black));
+        assert!(chess.is_check(Color::White));
+
+        chess.pieces.insert((8, 8), Piece::new(PieceType::King, Color::Black));
+        chess.pieces.insert((7, 7), Piece::new(PieceType::Pawn, Color::White));
+        assert!(chess.is_check(Color::Black));
+        chess.pieces.remove(&(8, 8));
+        chess.pieces.remove(&(7, 7));
+
+        chess.pieces.insert((8, 8), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(8, 8));
+        chess.pieces.insert((0, 0), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(0, 0));
+        chess.pieces.insert((0, 8), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(0, 8));
+        chess.pieces.insert((8, 0), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(8, 0));
+
+        chess.pieces.insert((4, 0), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(4, 0));
+        chess.pieces.insert((0, 4), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(0, 4));
+        chess.pieces.insert((3, 4), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(3, 4));
+        chess.pieces.insert((4, 8), Piece::new(PieceType::Bishop, Color::Black));
+        assert!(chess.is_check(Color::White));
+        chess.pieces.remove(&(4, 8));
     }
 
     #[test]

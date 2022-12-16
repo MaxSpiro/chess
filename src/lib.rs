@@ -359,7 +359,7 @@ impl Game {
         let mut piece_found = false;
         if let Some(directions) = directions {
             'all_directions: for direction in directions {
-                let mut i = 0;
+                let mut i = 1;
                 'inner: loop {
                     let coords = match next_coords(to, direction, i) {
                         Some(coords) => coords,
@@ -438,31 +438,126 @@ impl Game {
     }
 
     pub fn is_check(&self, color_in_check: Color) -> bool {
-        let mut simulated_chess = self.clone();
-        let king_coords = self.pieces
+        let ((king_x, king_y), _) = self.pieces
             .iter()
             .find(|(_, piece)| piece.0 == PieceType::King && piece.1 == color_in_check)
-            .unwrap().0;
+            .unwrap();
         let attacking_color = match color_in_check {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
-        simulated_chess.turn = attacking_color;
-        for (coords, piece) in simulated_chess.pieces
+        for ((piece_x, piece_y), Piece(piece_type, _color)) in self.pieces
             .iter()
             .filter(|(_, piece)| piece.1 == attacking_color) {
-            let chess_result = simulated_chess.simulate_move(Command {
-                from: (Some(coords.0), Some(coords.1)),
-                to: *king_coords,
-                piece: piece.0,
-                special: None,
-                takes: true,
-            });
-            println!("{:?} {:?} {:?} {:?}", coords, piece, king_coords, chess_result);
-            if let Ok(_) = chess_result {
-                return true;
+            match piece_type {
+                PieceType::Pawn => {
+                    if
+                        king_x.abs_diff(*piece_x) == 1 &&
+                        *king_y ==
+                            (if attacking_color == Color::White {
+                                piece_y + 1
+                            } else {
+                                piece_y - 1
+                            })
+                    {
+                        return true;
+                    }
+                }
+                PieceType::Knight => {
+                    if
+                        (king_x.abs_diff(*piece_x) == 2 && king_y.abs_diff(*piece_y) == 1) ||
+                        (king_x.abs_diff(*piece_x) == 1 && king_y.abs_diff(*piece_y) == 2)
+                    {
+                        return true;
+                    }
+                }
+                PieceType::Queen => {
+                    if king_x != piece_x && king_y != piece_y {
+                        if king_x.abs_diff(*piece_x) != king_y.abs_diff(*piece_y) {
+                            continue;
+                        }
+                    }
+                    let (direction_x, direction_y) = (
+                        king_x.cmp(piece_x) as isize,
+                        king_y.cmp(piece_y) as isize,
+                    );
+                    let mut i = 1;
+                    loop {
+                        let coords = match
+                            next_coords((*piece_x, *piece_y), (direction_x, direction_y), i)
+                        {
+                            Some(coords) => coords,
+                            None => {
+                                break;
+                            }
+                        };
+                        if coords == (*king_x, *king_y) {
+                            return true;
+                        }
+                        if self.pieces.contains_key(&coords) {
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                PieceType::Rook => {
+                    if king_x != piece_x && king_y != piece_y {
+                        continue;
+                    }
+                    let (direction_x, direction_y) = (
+                        king_x.cmp(piece_x) as isize,
+                        king_y.cmp(piece_y) as isize,
+                    );
+                    let mut i = 1;
+                    loop {
+                        let coords = match
+                            next_coords((*piece_x, *piece_y), (direction_x, direction_y), i)
+                        {
+                            Some(coords) => coords,
+                            None => {
+                                break;
+                            }
+                        };
+                        if coords == (*king_x, *king_y) {
+                            return true;
+                        }
+                        if self.pieces.contains_key(&coords) {
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                PieceType::Bishop => {
+                    if king_x.abs_diff(*piece_x) != king_y.abs_diff(*piece_y) {
+                        continue;
+                    }
+                    let (direction_x, direction_y) = (
+                        king_x.cmp(piece_x) as isize,
+                        king_y.cmp(piece_y) as isize,
+                    );
+                    let mut i = 1;
+                    loop {
+                        let coords = match
+                            next_coords((*piece_x, *piece_y), (direction_x, direction_y), i)
+                        {
+                            Some(coords) => coords,
+                            None => {
+                                break;
+                            }
+                        };
+                        if coords == (*king_x, *king_y) {
+                            return true;
+                        }
+                        if self.pieces.contains_key(&coords) {
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                _ => {}
             }
         }
+
         false
     }
 }
@@ -505,34 +600,12 @@ fn next_coords(
     direction: (isize, isize),
     step: isize
 ) -> Option<(usize, usize)> {
-    let x =
-        (origin.0 as isize) +
-        (direction.0 +
-            (
-                (if direction.0 < 0 {
-                    -1 * step
-                } else if direction.0 > 0 {
-                    step
-                } else {
-                    0
-                }) as isize
-            ));
-    let y =
-        (origin.1 as isize) +
-        (direction.1 +
-            (
-                (if direction.1 < 0 {
-                    -1 * step
-                } else if direction.1 > 0 {
-                    step
-                } else {
-                    0
-                }) as isize
-            ));
-
-    let (x, y) = (x.try_into(), y.try_into());
-    match (x, y) {
-        (Ok(x @ 0..=7), Ok(y @ 0..=7)) => Some((x, y)),
-        _ => None,
+    let (x, y) = origin;
+    let (direction_x, direction_y) = direction;
+    let x = (x as isize) + direction_x * step;
+    let y = (y as isize) + direction_y * step;
+    if x < 0 || x > 7 || y < 0 || y > 7 {
+        return None;
     }
+    Some((x as usize, y as usize))
 }
