@@ -5,11 +5,16 @@ fn main() {
     let mut input = String::new();
     loop {
         println!("It is {:?}'s turn, enter a move", &chess.turn);
-        println!("{:?}", chess.state);
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
                     let result = chess.play(command);
+                    match result {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("{:?}", e);
+                        }
+                    }
                 } else {
                     println!("Invalid move");
                 }

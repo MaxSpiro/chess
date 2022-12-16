@@ -214,7 +214,8 @@ impl Game {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
-        match special {
+        let (mut to_remove, mut to_insert) = (vec![], vec![]);
+        let is_castle = match special {
             Some(castle @ Special::LongCastle | castle @ Special::Castle) => {
                 if piece != PieceType::King {
                     return Err(ChessError::InvalidMove);
@@ -250,24 +251,25 @@ impl Game {
                         return Err(ChessError::InvalidMove);
                     }
                 }
-                let king = self.pieces.remove(&from_king).unwrap();
-                let rook = self.pieces.remove(&from_rook).unwrap();
-                self.pieces.insert(to_king, king);
-                self.pieces.insert(to_rook, rook);
-                self.next_turn();
-                return Ok(());
+                to_remove.push(from_king);
+                to_remove.push(from_rook);
+                to_insert.push(to_king);
+                to_insert.push(to_rook);
+                true
             }
-            _ => {}
-        }
-        match self.pieces.get(&to) {
-            Some(_) => {
-                if !takes {
-                    return Err(ChessError::InvalidMove);
+            _ => { false }
+        };
+        if !is_castle {
+            match self.pieces.get(&to) {
+                Some(_) => {
+                    if !takes {
+                        return Err(ChessError::InvalidMove);
+                    }
                 }
-            }
-            None => {
-                if takes {
-                    return Err(ChessError::InvalidMove);
+                None => {
+                    if takes {
+                        return Err(ChessError::InvalidMove);
+                    }
                 }
             }
         }
@@ -329,26 +331,28 @@ impl Game {
                 directions = Some(vec![(1, 1), (1, -1), (-1, 1), (-1, -1)]);
             }
             PieceType::King => {
-                possible_coords = Some(
-                    [
-                        (to.0.checked_add(1), to.1.checked_add(1)),
-                        (to.0.checked_add(1), to.1.checked_sub(1)),
-                        (to.0.checked_sub(1), to.1.checked_add(1)),
-                        (to.0.checked_sub(1), to.1.checked_sub(1)),
-                        (to.0.checked_add(1), Some(to.1)),
-                        (to.0.checked_sub(1), Some(to.1)),
-                        (Some(to.0), to.1.checked_add(1)),
-                        (Some(to.0), to.1.checked_sub(1)),
-                    ]
-                        .iter()
-                        .filter_map(|(x, y)| {
-                            match (x, y) {
-                                (Some(x), Some(y)) if *x < 8 && *y < 8 => Some((*x, *y)),
-                                _ => None,
-                            }
-                        })
-                        .collect()
-                );
+                if !is_castle {
+                    possible_coords = Some(
+                        [
+                            (to.0.checked_add(1), to.1.checked_add(1)),
+                            (to.0.checked_add(1), to.1.checked_sub(1)),
+                            (to.0.checked_sub(1), to.1.checked_add(1)),
+                            (to.0.checked_sub(1), to.1.checked_sub(1)),
+                            (to.0.checked_add(1), Some(to.1)),
+                            (to.0.checked_sub(1), Some(to.1)),
+                            (Some(to.0), to.1.checked_add(1)),
+                            (Some(to.0), to.1.checked_sub(1)),
+                        ]
+                            .iter()
+                            .filter_map(|(x, y)| {
+                                match (x, y) {
+                                    (Some(x), Some(y)) if *x < 8 && *y < 8 => Some((*x, *y)),
+                                    _ => None,
+                                }
+                            })
+                            .collect()
+                    );
+                }
             }
             PieceType::Queen => {
                 directions = Some(
@@ -374,8 +378,8 @@ impl Game {
                             coords_match_from(coords, from)
                         => {
                             piece_found = true;
-                            let moved_piece = self.pieces.remove(&coords).unwrap();
-                            self.pieces.insert(to, moved_piece);
+                            to_remove.push(coords);
+                            to_insert.push(to);
                             break 'all_directions;
                         }
                         Some(_) => {
@@ -395,39 +399,33 @@ impl Game {
                         coords_match_from(coords, from)
                     => {
                         piece_found = true;
-                        let moved_piece = self.pieces.remove(&coords).unwrap();
-                        self.pieces.insert(to, moved_piece);
+                        to_remove.push(coords);
+                        to_insert.push(to);
                         break;
                     }
                     _ => {}
                 }
             }
-        } else {
-            return Err(ChessError::InvalidMove);
         }
-        println!("{:?} {:?}", piece, piece_found);
-        if !piece_found {
+        if !piece_found && !is_castle {
             return Err(ChessError::InvalidMove);
         }
 
-        if let Some(check) = special {
-            match check {
-                Special::Check => {
-                    if self.is_check(other_color) {
-                        self.state = GameState::Check(other_color);
-                    }
-                }
-                _ => {}
+        for (from, to) in to_remove.iter().zip(to_insert.iter()) {
+            let piece = self.pieces.remove(from);
+            self.pieces.insert(*to, piece.unwrap());
+        }
+
+        if self.is_check(other_color) {
+            println!("Check! {:?}", self.is_check(other_color));
+            if let Some(Special::Check | Special::Checkmate) = special {
+                self.state = GameState::Check(other_color);
+            } else {
+                return Err(ChessError::InvalidMove);
             }
         }
         self.next_turn();
         Ok(())
-    }
-
-    fn simulate_move(&self, command: Command) -> Result<Self, ChessError> {
-        let mut new_chess = self.clone();
-        new_chess.play(command)?;
-        Ok(new_chess)
     }
 
     fn next_turn(&mut self) {
