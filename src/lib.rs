@@ -33,7 +33,7 @@ impl Piece {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Game {
     pub turn: Color,
     pub pieces: HashMap<(usize, usize), Piece>,
@@ -401,12 +401,30 @@ impl Game {
         } else {
             return Err(ChessError::InvalidMove);
         }
+        println!("{:?} {:?}", piece, piece_found);
         if !piece_found {
             return Err(ChessError::InvalidMove);
         }
 
         self.next_turn();
+        if let Some(check) = special {
+            match check {
+                Special::Check => {
+                    if self.is_check(self.turn) {
+                        self.state = GameState::Check(self.turn);
+                    }
+                }
+                _ => {}
+            }
+        }
         Ok(())
+    }
+
+    fn simulate_move(&self, command: Command) -> Result<Self, ChessError> {
+        let mut new_chess = self.clone();
+        new_chess.next_turn();
+        new_chess.play(command)?;
+        Ok(new_chess)
     }
 
     fn next_turn(&mut self) {
@@ -414,6 +432,31 @@ impl Game {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
+    }
+
+    pub fn is_check(&self, color_in_check: Color) -> bool {
+        let king_coords = self.pieces
+            .iter()
+            .find(|(_, piece)| piece.0 == PieceType::King && piece.1 == color_in_check)
+            .unwrap().0;
+        let attacking_color = match color_in_check {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        };
+        for (coords, piece) in self.pieces.iter().filter(|(_, piece)| piece.1 == attacking_color) {
+            let chess_result = self.simulate_move(Command {
+                from: (Some(coords.0), Some(coords.1)),
+                to: *king_coords,
+                piece: piece.0,
+                special: None,
+                takes: true,
+            });
+            println!("{:?} {:?} {:?} {:?}", coords, piece, king_coords, chess_result);
+            if let Ok(_) = chess_result {
+                return true;
+            }
+        }
+        false
     }
 }
 

@@ -5,12 +5,11 @@ fn main() {
     let mut input = String::new();
     loop {
         println!("It is {:?}'s turn, enter a move", &chess.turn);
-
+        println!("{:?}", chess.state);
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
                     let result = chess.play(command);
-                    println!("{:?}", result);
                 } else {
                     println!("Invalid move");
                 }
@@ -139,6 +138,19 @@ mod tests {
     }
 
     #[test]
+    fn check() {
+        let mut chess = Game::new();
+        let moves = ["e4", "e5", "Qh5", "Nc6", "Qxf7+"];
+        for command in moves {
+            println!("{} ", command);
+            chess.play(Command::parse(command).unwrap()).unwrap();
+        }
+        assert_eq!(chess.pieces.get(&(5, 6)), Some(&Piece::new(PieceType::Queen, Color::White)));
+        assert_eq!(chess.pieces.get(&(4, 7)), Some(&Piece::new(PieceType::King, Color::Black)));
+        assert!(chess.is_check(Color::Black))
+    }
+
+    #[test]
     fn ruy_lopez() {
         let mut chess = Game::new();
         let moves = [
@@ -235,12 +247,13 @@ mod tests {
         assert_eq!(result, Ok(()));
         let result = chess.play(Command::parse("Nf6").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Qxf7#").unwrap());
+        let result = chess.play(Command::parse("Qxf7+").unwrap());
         assert_eq!(result, Ok(()));
 
         assert_eq!(chess.pieces.get(&(5, 6)), Some(&Piece::new(PieceType::Queen, Color::White)));
+        assert_eq!(chess.pieces.get(&(4, 7)), Some(&Piece::new(PieceType::King, Color::Black)));
         assert_eq!(chess.pieces.get(&(2, 3)), Some(&Piece::new(PieceType::Bishop, Color::White)));
 
-        assert_eq!(chess.state, GameState::Checkmate(Color::White));
+        assert_eq!(chess.state, GameState::Check(Color::Black));
     }
 }
