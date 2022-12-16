@@ -167,38 +167,38 @@ impl Game {
         Game {
             turn: Color::White,
             pieces: [
-                ((0, 0), Piece(PieceType::Rook, Color::White)),
-                ((1, 0), Piece(PieceType::Knight, Color::White)),
-                ((2, 0), Piece(PieceType::Bishop, Color::White)),
-                ((3, 0), Piece(PieceType::Queen, Color::White)),
-                ((4, 0), Piece(PieceType::King, Color::White)),
-                ((5, 0), Piece(PieceType::Bishop, Color::White)),
-                ((6, 0), Piece(PieceType::Knight, Color::White)),
-                ((7, 0), Piece(PieceType::Rook, Color::White)),
-                ((0, 1), Piece(PieceType::Pawn, Color::White)),
-                ((1, 1), Piece(PieceType::Pawn, Color::White)),
-                ((2, 1), Piece(PieceType::Pawn, Color::White)),
-                ((3, 1), Piece(PieceType::Pawn, Color::White)),
-                ((4, 1), Piece(PieceType::Pawn, Color::White)),
-                ((5, 1), Piece(PieceType::Pawn, Color::White)),
-                ((6, 1), Piece(PieceType::Pawn, Color::White)),
-                ((7, 1), Piece(PieceType::Pawn, Color::White)),
-                ((0, 7), Piece(PieceType::Rook, Color::Black)),
-                ((1, 7), Piece(PieceType::Knight, Color::Black)),
-                ((2, 7), Piece(PieceType::Bishop, Color::Black)),
-                ((3, 7), Piece(PieceType::Queen, Color::Black)),
-                ((4, 7), Piece(PieceType::King, Color::Black)),
-                ((5, 7), Piece(PieceType::Bishop, Color::Black)),
-                ((6, 7), Piece(PieceType::Knight, Color::Black)),
-                ((7, 7), Piece(PieceType::Rook, Color::Black)),
-                ((0, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((1, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((2, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((3, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((4, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((5, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((6, 6), Piece(PieceType::Pawn, Color::Black)),
-                ((7, 6), Piece(PieceType::Pawn, Color::Black)),
+                ((1, 1), Piece(PieceType::Rook, Color::White)),
+                ((2, 1), Piece(PieceType::Knight, Color::White)),
+                ((3, 1), Piece(PieceType::Bishop, Color::White)),
+                ((4, 1), Piece(PieceType::Queen, Color::White)),
+                ((5, 1), Piece(PieceType::King, Color::White)),
+                ((6, 1), Piece(PieceType::Bishop, Color::White)),
+                ((7, 1), Piece(PieceType::Knight, Color::White)),
+                ((8, 1), Piece(PieceType::Rook, Color::White)),
+                ((1, 2), Piece(PieceType::Pawn, Color::White)),
+                ((2, 2), Piece(PieceType::Pawn, Color::White)),
+                ((3, 2), Piece(PieceType::Pawn, Color::White)),
+                ((4, 2), Piece(PieceType::Pawn, Color::White)),
+                ((5, 2), Piece(PieceType::Pawn, Color::White)),
+                ((6, 2), Piece(PieceType::Pawn, Color::White)),
+                ((7, 2), Piece(PieceType::Pawn, Color::White)),
+                ((8, 2), Piece(PieceType::Pawn, Color::White)),
+                ((1, 8), Piece(PieceType::Rook, Color::Black)),
+                ((2, 8), Piece(PieceType::Knight, Color::Black)),
+                ((3, 8), Piece(PieceType::Bishop, Color::Black)),
+                ((4, 8), Piece(PieceType::Queen, Color::Black)),
+                ((5, 8), Piece(PieceType::King, Color::Black)),
+                ((6, 8), Piece(PieceType::Bishop, Color::Black)),
+                ((7, 8), Piece(PieceType::Knight, Color::Black)),
+                ((8, 8), Piece(PieceType::Rook, Color::Black)),
+                ((1, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((2, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((3, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((4, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((5, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((6, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((7, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((8, 7), Piece(PieceType::Pawn, Color::Black)),
             ]
                 .iter()
                 .cloned()
@@ -221,29 +221,29 @@ impl Game {
                     return Err(ChessError::InvalidMove);
                 }
                 let rook_col = match castle {
-                    Special::LongCastle => 0,
-                    Special::Castle => 7,
+                    Special::LongCastle => 1,
+                    Special::Castle => 8,
                     _ => unreachable!(),
                 };
                 let home_row = match color {
-                    Color::White => 0,
-                    Color::Black => 7,
+                    Color::White => 1,
+                    Color::Black => 8,
                 };
-                let (from_king, from_rook) = ((4, home_row), (rook_col, home_row));
+                let (from_king, from_rook) = ((5, home_row), (rook_col, home_row));
                 if self.pieces.get(&from_king).is_none() || self.pieces.get(&from_rook).is_none() {
                     return Err(ChessError::InvalidMove);
                 }
                 let (to_king, to_rook) = match castle {
-                    Special::LongCastle => ((2, home_row), (3, home_row)),
-                    Special::Castle => ((6, home_row), (5, home_row)),
+                    Special::LongCastle => ((3, home_row), (4, home_row)),
+                    Special::Castle => ((7, home_row), (6, home_row)),
                     _ => unreachable!(),
                 };
                 if self.pieces.get(&to_king).is_some() || self.pieces.get(&to_rook).is_some() {
                     return Err(ChessError::InvalidMove);
                 }
                 let range = match castle {
-                    Special::LongCastle => 1..4,
-                    Special::Castle => 5..7,
+                    Special::LongCastle => 2..5,
+                    Special::Castle => 6..8,
                     _ => unreachable!(),
                 };
                 for col in range {
@@ -294,8 +294,8 @@ impl Game {
                 } else {
                     coords.push((to.0, diff(to.1, 1)));
                     if
-                        (*color == Color::White && to.1 == 3) ||
-                        (*color == Color::Black && to.1 == 4)
+                        (*color == Color::White && to.1 == 4) ||
+                        (*color == Color::Black && to.1 == 5)
                     {
                         coords.push((to.0, diff(to.1, 2)));
                     }
@@ -317,7 +317,7 @@ impl Game {
                         .iter()
                         .filter_map(|(x, y)| {
                             match (x, y) {
-                                (Some(x), Some(y)) if *x < 8 && *y < 8 => Some((*x, *y)),
+                                (Some(x), Some(y)) if *x <= 8 && *y <= 8 => Some((*x, *y)),
                                 _ => None,
                             }
                         })
@@ -346,7 +346,7 @@ impl Game {
                             .iter()
                             .filter_map(|(x, y)| {
                                 match (x, y) {
-                                    (Some(x), Some(y)) if *x < 8 && *y < 8 => Some((*x, *y)),
+                                    (Some(x), Some(y)) if *x <= 8 && *y <= 8 => Some((*x, *y)),
                                     _ => None,
                                 }
                             })
@@ -447,124 +447,115 @@ impl Game {
         for ((piece_x, piece_y), Piece(piece_type, _color)) in self.pieces
             .iter()
             .filter(|(_, piece)| piece.1 == attacking_color) {
-            match piece_type {
-                PieceType::Pawn => {
-                    if
-                        king_x.abs_diff(*piece_x) == 1 &&
-                        *king_y ==
-                            (if attacking_color == Color::White {
-                                piece_y + 1
-                            } else {
-                                piece_y - 1
-                            })
-                    {
-                        return true;
+            if
+                self.can_piece_reach(
+                    (*piece_x, *piece_y),
+                    (*king_x, *king_y),
+                    *piece_type,
+                    attacking_color
+                )
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn can_piece_reach(
+        &self,
+        from: (usize, usize),
+        to: (usize, usize),
+        piece_type: PieceType,
+        color: Color
+    ) -> bool {
+        let (from_x, from_y) = from;
+        let (to_x, to_y) = to;
+        let traverse = || {
+            let (direction_x, direction_y) = (
+                to_x.cmp(&from_x) as isize,
+                to_y.cmp(&from_y) as isize,
+            );
+            let mut i = 1;
+            loop {
+                let coords = match next_coords((from_x, from_y), (direction_x, direction_y), i) {
+                    Some(coords) => coords,
+                    None => {
+                        break;
+                    }
+                };
+                if coords == (to_x, to_y) {
+                    return true;
+                }
+                if self.pieces.contains_key(&coords) {
+                    break;
+                }
+                i += 1;
+            }
+            return false;
+        };
+        match piece_type {
+            PieceType::Pawn => {
+                if
+                    to_x.abs_diff(from_x) == 1 &&
+                    to_y == (if color == Color::White { from_y + 1 } else { from_y - 1 })
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            PieceType::Knight => {
+                if
+                    (to_x.abs_diff(from_x) == 2 && to_y.abs_diff(from_y) == 1) ||
+                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 2)
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            PieceType::King => {
+                if
+                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 0) ||
+                    (to_x.abs_diff(from_x) == 0 && to_y.abs_diff(from_y) == 1) ||
+                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 1)
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            PieceType::Queen => {
+                if to_x != from_x && to_y != from_y {
+                    if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
+                        return false;
                     }
                 }
-                PieceType::Knight => {
-                    if
-                        (king_x.abs_diff(*piece_x) == 2 && king_y.abs_diff(*piece_y) == 1) ||
-                        (king_x.abs_diff(*piece_x) == 1 && king_y.abs_diff(*piece_y) == 2)
-                    {
-                        return true;
-                    }
+            }
+            PieceType::Rook => {
+                if to_x != from_x && to_y != from_y {
+                    return false;
                 }
-                PieceType::Queen => {
-                    if king_x != piece_x && king_y != piece_y {
-                        if king_x.abs_diff(*piece_x) != king_y.abs_diff(*piece_y) {
-                            continue;
-                        }
-                    }
-                    let (direction_x, direction_y) = (
-                        king_x.cmp(piece_x) as isize,
-                        king_y.cmp(piece_y) as isize,
-                    );
-                    let mut i = 1;
-                    loop {
-                        let coords = match
-                            next_coords((*piece_x, *piece_y), (direction_x, direction_y), i)
-                        {
-                            Some(coords) => coords,
-                            None => {
-                                break;
-                            }
-                        };
-                        if coords == (*king_x, *king_y) {
-                            return true;
-                        }
-                        if self.pieces.contains_key(&coords) {
-                            break;
-                        }
-                        i += 1;
-                    }
+            }
+            PieceType::Bishop => {
+                if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
+                    return false;
                 }
-                PieceType::Rook => {
-                    if king_x != piece_x && king_y != piece_y {
-                        continue;
-                    }
-                    let (direction_x, direction_y) = (
-                        king_x.cmp(piece_x) as isize,
-                        king_y.cmp(piece_y) as isize,
-                    );
-                    let mut i = 1;
-                    loop {
-                        let coords = match
-                            next_coords((*piece_x, *piece_y), (direction_x, direction_y), i)
-                        {
-                            Some(coords) => coords,
-                            None => {
-                                break;
-                            }
-                        };
-                        if coords == (*king_x, *king_y) {
-                            return true;
-                        }
-                        if self.pieces.contains_key(&coords) {
-                            break;
-                        }
-                        i += 1;
-                    }
-                }
-                PieceType::Bishop => {
-                    if king_x.abs_diff(*piece_x) != king_y.abs_diff(*piece_y) {
-                        continue;
-                    }
-                    let (direction_x, direction_y) = (
-                        king_x.cmp(piece_x) as isize,
-                        king_y.cmp(piece_y) as isize,
-                    );
-                    let mut i = 1;
-                    loop {
-                        let coords = match
-                            next_coords((*piece_x, *piece_y), (direction_x, direction_y), i)
-                        {
-                            Some(coords) => coords,
-                            None => {
-                                break;
-                            }
-                        };
-                        if coords == (*king_x, *king_y) {
-                            return true;
-                        }
-                        if self.pieces.contains_key(&coords) {
-                            break;
-                        }
-                        i += 1;
-                    }
-                }
-                _ => {}
+            }
+            _ => {
+                unreachable!();
             }
         }
 
-        false
+        traverse()
     }
 }
 
 fn notation_to_coords(notation: &str) -> Option<(usize, usize)> {
     let mut chars = notation.chars();
-    let x = (chars.next().unwrap() as usize) - ('a' as usize);
-    let y = (chars.next().unwrap() as usize) - ('1' as usize);
-    if x > 7 || y > 7 {
+    let x = (chars.next().unwrap() as usize) - ('a' as usize) + 1;
+    let y = (chars.next().unwrap() as usize) - ('1' as usize) + 1;
+    if x > 8 || y > 8 {
         return None;
     }
     Some((x, y))
@@ -575,12 +566,12 @@ fn letter_to_column_index(letter: char) -> usize {
     if letter < 'a' || letter > 'h' {
         panic!("How did we get here? I thought we checked this already.");
     }
-    (letter as usize) - ('a' as usize)
+    (letter as usize) - ('a' as usize) + 1
 }
 
 fn coords_to_notation(coords: (usize, usize)) -> String {
-    let x = (coords.0 as u8) + ('a' as u8);
-    let y = (coords.1 as u8) + ('1' as u8);
+    let x = (coords.0 as u8) + ('a' as u8) - 1;
+    let y = (coords.1 as u8) + ('1' as u8) - 1;
     format!("{}{}", x as char, y as char)
 }
 
@@ -602,8 +593,26 @@ fn next_coords(
     let (direction_x, direction_y) = direction;
     let x = (x as isize) + direction_x * step;
     let y = (y as isize) + direction_y * step;
-    if x < 0 || x > 7 || y < 0 || y > 7 {
+    if x < 1 || x > 8 || y < 1 || y > 8 {
         return None;
     }
     Some((x as usize, y as usize))
+}
+
+fn coords_between(from: (usize, usize), to: (usize, usize)) -> Vec<(usize, usize)> {
+    let (from_x, from_y) = from;
+    let (to_x, to_y) = to;
+    let (direction_x, direction_y) = (from_x.cmp(&to_x) as isize, from_y.cmp(&to_y) as isize);
+    let mut i = 1;
+    let mut coords = vec![];
+    while from_x != to_x || from_y != to_y {
+        coords.push(match next_coords((from_x, from_y), (direction_x, direction_y), i) {
+            Some(coords) => coords,
+            None => {
+                break;
+            }
+        });
+        i += 1;
+    }
+    coords
 }
