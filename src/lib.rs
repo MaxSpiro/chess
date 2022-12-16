@@ -210,6 +210,10 @@ impl Game {
     pub fn play(&mut self, input: Command) -> Result<(), ChessError> {
         let Command { to, from, piece, takes, special } = input;
         let Game { turn: color, .. } = self;
+        let other_color = match color {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        };
         match special {
             Some(castle @ Special::LongCastle | castle @ Special::Castle) => {
                 if piece != PieceType::King {
@@ -406,23 +410,22 @@ impl Game {
             return Err(ChessError::InvalidMove);
         }
 
-        self.next_turn();
         if let Some(check) = special {
             match check {
                 Special::Check => {
-                    if self.is_check(self.turn) {
-                        self.state = GameState::Check(self.turn);
+                    if self.is_check(other_color) {
+                        self.state = GameState::Check(other_color);
                     }
                 }
                 _ => {}
             }
         }
+        self.next_turn();
         Ok(())
     }
 
     fn simulate_move(&self, command: Command) -> Result<Self, ChessError> {
         let mut new_chess = self.clone();
-        new_chess.next_turn();
         new_chess.play(command)?;
         Ok(new_chess)
     }
@@ -435,6 +438,7 @@ impl Game {
     }
 
     pub fn is_check(&self, color_in_check: Color) -> bool {
+        let mut simulated_chess = self.clone();
         let king_coords = self.pieces
             .iter()
             .find(|(_, piece)| piece.0 == PieceType::King && piece.1 == color_in_check)
@@ -443,8 +447,11 @@ impl Game {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
-        for (coords, piece) in self.pieces.iter().filter(|(_, piece)| piece.1 == attacking_color) {
-            let chess_result = self.simulate_move(Command {
+        simulated_chess.turn = attacking_color;
+        for (coords, piece) in simulated_chess.pieces
+            .iter()
+            .filter(|(_, piece)| piece.1 == attacking_color) {
+            let chess_result = simulated_chess.simulate_move(Command {
                 from: (Some(coords.0), Some(coords.1)),
                 to: *king_coords,
                 piece: piece.0,
