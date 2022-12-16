@@ -257,7 +257,7 @@ impl Game {
                 to_insert.push(to_rook);
                 true
             }
-            _ => { false }
+            _ => false,
         };
         if !is_castle {
             match self.pieces.get(&to) {
@@ -466,29 +466,6 @@ impl Game {
     ) -> bool {
         let (from_x, from_y) = from;
         let (to_x, to_y) = to;
-        let traverse = || {
-            let (direction_x, direction_y) = (
-                to_x.cmp(&from_x) as isize,
-                to_y.cmp(&from_y) as isize,
-            );
-            let mut i = 1;
-            loop {
-                let coords = match next_coords((from_x, from_y), (direction_x, direction_y), i) {
-                    Some(coords) => coords,
-                    None => {
-                        break;
-                    }
-                };
-                if coords == (to_x, to_y) {
-                    return true;
-                }
-                if self.pieces.contains_key(&coords) {
-                    break;
-                }
-                i += 1;
-            }
-            return false;
-        };
         match piece_type {
             PieceType::Pawn => {
                 if
@@ -543,7 +520,24 @@ impl Game {
             }
         }
 
-        traverse()
+        let (direction_x, direction_y) = (to_x.cmp(&from_x) as isize, to_y.cmp(&from_y) as isize);
+        let mut i = 1;
+        loop {
+            let coords = match next_coords((from_x, from_y), (direction_x, direction_y), i) {
+                Some(coords) => coords,
+                None => {
+                    break;
+                }
+            };
+            if coords == (to_x, to_y) {
+                return true;
+            }
+            if self.pieces.contains_key(&coords) {
+                break;
+            }
+            i += 1;
+        }
+        false
     }
 }
 

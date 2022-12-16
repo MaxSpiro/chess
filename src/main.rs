@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn castle_to_check() {
+    fn castle_and_check() {
         let mut game = Game::new();
         let moves = [
             "e4",
@@ -288,6 +288,17 @@ mod tests {
             game.play(Command::parse(command).unwrap()).unwrap();
         }
         assert!(game.is_check(Color::Black));
+
+        // test long castle
+        game = Game::new();
+        let moves = ["Nc3", "Nc6", "d4", "d5", "Bf4", "Bg4", "Qd2", "Qd7", "O-O-O", "O-O-O"];
+        for command in moves {
+            game.play(Command::parse(command).unwrap()).unwrap();
+        }
+        assert_eq!(game.pieces.get(&(3, 1)).unwrap(), &Piece::new(PieceType::King, Color::White));
+        assert_eq!(game.pieces.get(&(4, 1)).unwrap(), &Piece::new(PieceType::Rook, Color::White));
+        assert_eq!(game.pieces.get(&(3, 8)).unwrap(), &Piece::new(PieceType::King, Color::Black));
+        assert_eq!(game.pieces.get(&(4, 8)).unwrap(), &Piece::new(PieceType::Rook, Color::Black));
     }
 
     #[test]
