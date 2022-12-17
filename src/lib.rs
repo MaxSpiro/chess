@@ -25,11 +25,260 @@ pub enum GameState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Piece(pub PieceType, pub Color);
+pub struct Piece {
+    pub piece_type: PieceType,
+    pub color: Color,
+}
 
 impl Piece {
     pub fn new(piece_type: PieceType, color: Color) -> Self {
-        Self(piece_type, color)
+        Self { piece_type, color }
+    }
+
+    pub fn get_possible_moves(
+        &self,
+        piece_coords: (usize, usize),
+        pieces_on_board: &HashMap<(usize, usize), Self>
+    ) -> Vec<Command> {
+        let (piece_x, piece_y) = piece_coords;
+        let from = (Some(piece_x), Some(piece_y));
+        let mut moves = vec![];
+        match self.piece_type {
+            PieceType::Pawn => {
+                let pawn_row = match self.color {
+                    Color::White => 2,
+                    Color::Black => 7,
+                };
+                let pawn_steps = if piece_y == pawn_row { 1..3 } else { 1..2 };
+                for step in pawn_steps {
+                    if let Some(new_y) = pawn_move(piece_y, step, self.color) {
+                        if pieces_on_board.get(&(piece_x, new_y)).is_none() {
+                            moves.push(Command {
+                                from,
+                                takes: false,
+                                piece: self.piece_type,
+                                special: None,
+                                to: (piece_x, new_y),
+                            });
+                        }
+                        // can also calculate capture when step is 1
+                        if step == 1 {
+                            for possible_capture in [piece_x.checked_sub(1), piece_x.checked_add(1)]
+                                .into_iter()
+                                .filter_map(|optional_coord| {
+                                    if let Some(x_coord) = optional_coord {
+                                        if x_coord > 0 && x_coord <= 8 {
+                                            return Some((x_coord, new_y));
+                                        }
+                                    }
+                                    None
+                                }) {
+                                match pieces_on_board.get(&possible_capture) {
+                                    Some(piece) if piece.color != self.color => {
+                                        moves.push(Command {
+                                            from,
+                                            piece: self.piece_type,
+                                            special: None,
+                                            takes: true,
+                                            to: possible_capture,
+                                        });
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            PieceType::King | PieceType::Knight => {
+                for possible_coords in self.get_candidate_moves(piece_coords) {
+                    if let (Some(x), Some(y)) = possible_coords {
+                        if x < 1 || x > 8 || y < 1 || y > 8 {
+                            continue;
+                        }
+                        let takes;
+                        match pieces_on_board.get(&(x, y)) {
+                            Some(piece) if piece.color != self.color => {
+                                takes = true;
+                            }
+                            None => {
+                                takes = false;
+                            }
+                            _ => {
+                                continue;
+                            }
+                        }
+                        moves.push(Command {
+                            from,
+                            piece: self.piece_type,
+                            special: None,
+                            takes,
+                            to: (x, y),
+                        });
+                    }
+                }
+            }
+            PieceType::Bishop | PieceType::Queen | PieceType::Rook => {
+                let directions = self.get_direction_vectors();
+                for direction in directions {
+                    let mut step = 1;
+                    loop {
+                        if let Some(next_coords) = next_coords(piece_coords, direction, step) {
+                            let takes;
+                            match pieces_on_board.get(&next_coords) {
+                                Some(piece) => {
+                                    if piece.color == self.color {
+                                        break;
+                                    } else {
+                                        takes = true;
+                                    }
+                                }
+                                None => {
+                                    takes = false;
+                                }
+                            }
+                            moves.push(Command {
+                                from,
+                                piece: self.piece_type,
+                                special: None,
+                                takes,
+                                to: next_coords,
+                            });
+                        } else {
+                            break;
+                        }
+                        step += 1;
+                    }
+                }
+            }
+        }
+        moves
+    }
+
+    fn can_take(
+        &self,
+        piece_coords: (usize, usize),
+        target_coords: (usize, usize),
+        pieces_on_board: &HashMap<(usize, usize), Self>
+    ) -> bool {
+        let (from_x, from_y) = piece_coords;
+        let (to_x, to_y) = target_coords;
+        match self.piece_type {
+            PieceType::Pawn => {
+                if
+                    to_x.abs_diff(from_x) == 1 &&
+                    to_y == (if self.color == Color::White { from_y + 1 } else { from_y - 1 })
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            PieceType::Knight => {
+                if
+                    (to_x.abs_diff(from_x) == 2 && to_y.abs_diff(from_y) == 1) ||
+                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 2)
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            PieceType::King => {
+                if
+                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 0) ||
+                    (to_x.abs_diff(from_x) == 0 && to_y.abs_diff(from_y) == 1) ||
+                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 1)
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            PieceType::Queen => {
+                if to_x != from_x && to_y != from_y {
+                    if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
+                        return false;
+                    }
+                }
+            }
+            PieceType::Rook => {
+                if to_x != from_x && to_y != from_y {
+                    return false;
+                }
+            }
+            PieceType::Bishop => {
+                if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
+                    return false;
+                }
+            }
+            _ => {
+                unreachable!();
+            }
+        }
+
+        let (direction_x, direction_y) = (to_x.cmp(&from_x) as isize, to_y.cmp(&from_y) as isize);
+        let mut i = 1;
+        loop {
+            let coords = match next_coords((from_x, from_y), (direction_x, direction_y), i) {
+                Some(coords) => coords,
+                None => {
+                    break;
+                }
+            };
+            if coords == (to_x, to_y) {
+                return true;
+            }
+            if pieces_on_board.contains_key(&coords) {
+                break;
+            }
+            i += 1;
+        }
+        false
+    }
+
+    pub fn get_direction_vectors(&self) -> Vec<(isize, isize)> {
+        match self.piece_type {
+            PieceType::Bishop => vec![(1, 1), (1, -1), (-1, 1), (-1, -1)],
+            PieceType::Rook => vec![(1, 0), (-1, 0), (0, 1), (0, -1)],
+            PieceType::Queen =>
+                vec![(1, 1), (1, -1), (-1, 1), (-1, -1), (1, 0), (-1, 0), (0, 1), (0, -1)],
+            _ => panic!("Only bishops, rooks, and queens move with a direction vector"),
+        }
+    }
+
+    pub fn get_candidate_moves(
+        &self,
+        piece_coords: (usize, usize)
+    ) -> Vec<(Option<usize>, Option<usize>)> {
+        let (piece_x, piece_y) = piece_coords;
+        match self.piece_type {
+            PieceType::Knight => {
+                vec![
+                    (piece_x.checked_add(1), piece_y.checked_add(2)),
+                    (piece_x.checked_add(1), piece_y.checked_sub(2)),
+                    (piece_x.checked_sub(1), piece_y.checked_add(2)),
+                    (piece_x.checked_sub(1), piece_y.checked_sub(2)),
+                    (piece_x.checked_add(2), piece_y.checked_add(1)),
+                    (piece_x.checked_add(2), piece_y.checked_sub(1)),
+                    (piece_x.checked_sub(2), piece_y.checked_add(1)),
+                    (piece_x.checked_sub(2), piece_y.checked_sub(1))
+                ]
+            }
+            PieceType::King => {
+                vec![
+                    (piece_x.checked_add(1), piece_y.checked_add(1)),
+                    (piece_x.checked_add(1), piece_y.checked_sub(1)),
+                    (piece_x.checked_sub(1), piece_y.checked_add(1)),
+                    (piece_x.checked_sub(1), piece_y.checked_sub(1)),
+                    (piece_x.checked_add(1), Some(piece_y)),
+                    (piece_x.checked_sub(1), Some(piece_y)),
+                    (Some(piece_x), piece_y.checked_add(1)),
+                    (Some(piece_x), piece_y.checked_sub(1))
+                ]
+            }
+            _ => panic!("Only call candidate moves on a king or knight"),
+        }
     }
 }
 
@@ -207,38 +456,38 @@ impl Game {
         Game {
             turn: Color::White,
             pieces: [
-                ((1, 1), Piece(PieceType::Rook, Color::White)),
-                ((2, 1), Piece(PieceType::Knight, Color::White)),
-                ((3, 1), Piece(PieceType::Bishop, Color::White)),
-                ((4, 1), Piece(PieceType::Queen, Color::White)),
-                ((5, 1), Piece(PieceType::King, Color::White)),
-                ((6, 1), Piece(PieceType::Bishop, Color::White)),
-                ((7, 1), Piece(PieceType::Knight, Color::White)),
-                ((8, 1), Piece(PieceType::Rook, Color::White)),
-                ((1, 2), Piece(PieceType::Pawn, Color::White)),
-                ((2, 2), Piece(PieceType::Pawn, Color::White)),
-                ((3, 2), Piece(PieceType::Pawn, Color::White)),
-                ((4, 2), Piece(PieceType::Pawn, Color::White)),
-                ((5, 2), Piece(PieceType::Pawn, Color::White)),
-                ((6, 2), Piece(PieceType::Pawn, Color::White)),
-                ((7, 2), Piece(PieceType::Pawn, Color::White)),
-                ((8, 2), Piece(PieceType::Pawn, Color::White)),
-                ((1, 8), Piece(PieceType::Rook, Color::Black)),
-                ((2, 8), Piece(PieceType::Knight, Color::Black)),
-                ((3, 8), Piece(PieceType::Bishop, Color::Black)),
-                ((4, 8), Piece(PieceType::Queen, Color::Black)),
-                ((5, 8), Piece(PieceType::King, Color::Black)),
-                ((6, 8), Piece(PieceType::Bishop, Color::Black)),
-                ((7, 8), Piece(PieceType::Knight, Color::Black)),
-                ((8, 8), Piece(PieceType::Rook, Color::Black)),
-                ((1, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((2, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((3, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((4, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((5, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((6, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((7, 7), Piece(PieceType::Pawn, Color::Black)),
-                ((8, 7), Piece(PieceType::Pawn, Color::Black)),
+                ((1, 1), Piece { piece_type: PieceType::Rook, color: Color::White }),
+                ((2, 1), Piece { piece_type: PieceType::Knight, color: Color::White }),
+                ((3, 1), Piece { piece_type: PieceType::Bishop, color: Color::White }),
+                ((4, 1), Piece { piece_type: PieceType::Queen, color: Color::White }),
+                ((5, 1), Piece { piece_type: PieceType::King, color: Color::White }),
+                ((6, 1), Piece { piece_type: PieceType::Bishop, color: Color::White }),
+                ((7, 1), Piece { piece_type: PieceType::Knight, color: Color::White }),
+                ((8, 1), Piece { piece_type: PieceType::Rook, color: Color::White }),
+                ((1, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((2, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((3, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((4, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((5, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((6, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((7, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((8, 2), Piece { piece_type: PieceType::Pawn, color: Color::White }),
+                ((1, 8), Piece { piece_type: PieceType::Rook, color: Color::Black }),
+                ((2, 8), Piece { piece_type: PieceType::Knight, color: Color::Black }),
+                ((3, 8), Piece { piece_type: PieceType::Bishop, color: Color::Black }),
+                ((4, 8), Piece { piece_type: PieceType::Queen, color: Color::Black }),
+                ((5, 8), Piece { piece_type: PieceType::King, color: Color::Black }),
+                ((6, 8), Piece { piece_type: PieceType::Bishop, color: Color::Black }),
+                ((7, 8), Piece { piece_type: PieceType::Knight, color: Color::Black }),
+                ((8, 8), Piece { piece_type: PieceType::Rook, color: Color::Black }),
+                ((1, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((2, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((3, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((4, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((5, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((6, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((7, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
+                ((8, 7), Piece { piece_type: PieceType::Pawn, color: Color::Black }),
             ]
                 .iter()
                 .cloned()
@@ -414,7 +663,7 @@ impl Game {
                         }
                     };
                     match self.pieces.get(&coords) {
-                        Some(ref _piece @ Piece(_piecetype, _color)) if
+                        Some(ref _piece @ Piece { piece_type: _piecetype, color: _color }) if
                             _piecetype == &piece &&
                             _color == color &&
                             coords_match_from(coords, from)
@@ -435,7 +684,7 @@ impl Game {
         } else if let Some(possible_coords) = possible_coords {
             for coords in possible_coords {
                 match self.pieces.get(&coords) {
-                    Some(ref _piece @ Piece(_piecetype, _color)) if
+                    Some(ref _piece @ Piece { piece_type: _piecetype, color: _color }) if
                         _color == color &&
                         _piecetype == &piece &&
                         coords_match_from(coords, from)
@@ -474,117 +723,29 @@ impl Game {
     }
 
     pub fn is_check(&self, color_in_check: Color) -> bool {
-        let ((king_x, king_y), _) = match
+        let king_coords = match
             self.pieces
                 .iter()
-                .find(|(_, piece)| piece.0 == PieceType::King && piece.1 == color_in_check)
+                .find(
+                    |(_, piece)|
+                        piece.piece_type == PieceType::King && piece.color == color_in_check
+                )
         {
-            Some(coords) => coords,
+            Some((coords, _)) => coords,
             None => {
                 return false;
             }
         };
-
         let attacking_color = match color_in_check {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
-        for ((piece_x, piece_y), Piece(piece_type, _color)) in self.pieces
+        for (piece_coords, piece) in self.pieces
             .iter()
-            .filter(|(_, piece)| piece.1 == attacking_color) {
-            if
-                self.can_piece_take(
-                    (*piece_x, *piece_y),
-                    (*king_x, *king_y),
-                    *piece_type,
-                    attacking_color
-                )
-            {
+            .filter(|(_, piece)| piece.color == attacking_color) {
+            if piece.can_take(*piece_coords, *king_coords, &self.pieces) {
                 return true;
             }
-        }
-        false
-    }
-
-    fn can_piece_take(
-        &self,
-        from: (usize, usize),
-        to: (usize, usize),
-        piece_type: PieceType,
-        color: Color
-    ) -> bool {
-        let (from_x, from_y) = from;
-        let (to_x, to_y) = to;
-        match piece_type {
-            PieceType::Pawn => {
-                if
-                    to_x.abs_diff(from_x) == 1 &&
-                    to_y == (if color == Color::White { from_y + 1 } else { from_y - 1 })
-                {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            PieceType::Knight => {
-                if
-                    (to_x.abs_diff(from_x) == 2 && to_y.abs_diff(from_y) == 1) ||
-                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 2)
-                {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            PieceType::King => {
-                if
-                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 0) ||
-                    (to_x.abs_diff(from_x) == 0 && to_y.abs_diff(from_y) == 1) ||
-                    (to_x.abs_diff(from_x) == 1 && to_y.abs_diff(from_y) == 1)
-                {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            PieceType::Queen => {
-                if to_x != from_x && to_y != from_y {
-                    if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
-                        return false;
-                    }
-                }
-            }
-            PieceType::Rook => {
-                if to_x != from_x && to_y != from_y {
-                    return false;
-                }
-            }
-            PieceType::Bishop => {
-                if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
-                    return false;
-                }
-            }
-            _ => {
-                unreachable!();
-            }
-        }
-
-        let (direction_x, direction_y) = (to_x.cmp(&from_x) as isize, to_y.cmp(&from_y) as isize);
-        let mut i = 1;
-        loop {
-            let coords = match next_coords((from_x, from_y), (direction_x, direction_y), i) {
-                Some(coords) => coords,
-                None => {
-                    break;
-                }
-            };
-            if coords == (to_x, to_y) {
-                return true;
-            }
-            if self.pieces.contains_key(&coords) {
-                break;
-            }
-            i += 1;
         }
         false
     }
@@ -593,122 +754,9 @@ impl Game {
         // todo: filter moves that put player in check
         self.pieces
             .iter()
-            .filter(|(_, Piece(_, _color))| { _color == &color })
-            .flat_map(|(coords, piece)| { self.get_piece_moves(*coords, *piece) })
+            .filter(|(_, Piece { color: _color, .. })| { _color == &color })
+            .flat_map(|(coords, piece)| { piece.get_possible_moves(*coords, &self.pieces) })
             .collect()
-    }
-
-    pub fn get_piece_moves(&self, piece_coords: (usize, usize), piece: Piece) -> Vec<Command> {
-        let Piece(piece_type, color) = piece;
-        let (piece_x, piece_y) = piece_coords;
-        let from = (Some(piece_x), Some(piece_y));
-        let mut moves = vec![];
-        match piece_type {
-            PieceType::Knight => {
-                return [
-                    (piece_x.checked_add(1), piece_y.checked_add(2)),
-                    (piece_x.checked_add(1), piece_y.checked_sub(2)),
-                    (piece_x.checked_sub(1), piece_y.checked_add(2)),
-                    (piece_x.checked_sub(1), piece_y.checked_sub(2)),
-                    (piece_x.checked_add(2), piece_y.checked_add(1)),
-                    (piece_x.checked_add(2), piece_y.checked_sub(1)),
-                    (piece_x.checked_sub(2), piece_y.checked_add(1)),
-                    (piece_x.checked_sub(2), piece_y.checked_sub(1)),
-                ]
-                    .into_iter()
-                    .filter_map(|(x, y)| {
-                        match (x, y) {
-                            (Some(x), Some(y)) if x <= 8 && y <= 8 && x > 0 && y > 0 =>
-                                Some(Command {
-                                    from,
-                                    piece: piece_type,
-                                    special: None,
-                                    takes: self.pieces.get(&(x, y)).is_some(),
-                                    to: (x, y),
-                                }),
-                            _ => None,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-            }
-            PieceType::Pawn => {
-                let pawn_row = match color {
-                    Color::White => 2,
-                    Color::Black => 7,
-                };
-                let range = if piece_y == pawn_row { 1..3 } else { 1..2 };
-                for step in range {
-                    let next_move = pawn_move(piece_y, step, color);
-                    if let Some(new_y) = next_move {
-                        if self.pieces.get(&(piece_x, new_y)).is_none() {
-                            moves.push(Command {
-                                from,
-                                takes: false,
-                                piece: piece_type,
-                                special: None,
-                                to: (piece_x, new_y),
-                            });
-                        }
-                        // can also calculate capture here when step_y is 1
-                        if step == 1 {
-                            let (left_x, right_x) = (
-                                piece_x.checked_sub(1),
-                                piece_x.checked_add(1),
-                            );
-                            for possible_capture in [left_x, right_x].into_iter().filter_map(|opt| {
-                                match opt {
-                                    Some(x) if x > 0 && x < 9 => Some((x, new_y)),
-                                    _ => None,
-                                }
-                            }) {
-                                match self.pieces.get(&possible_capture) {
-                                    Some(Piece(_, _color)) if _color != &color => {
-                                        moves.push(Command {
-                                            from,
-                                            piece: piece_type,
-                                            special: None,
-                                            takes: true,
-                                            to: possible_capture,
-                                        });
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            PieceType::King => {
-                // todo if can castle; should implement on King struct?
-                return [
-                    (piece_x.checked_add(1), piece_y.checked_add(1)),
-                    (piece_x.checked_add(1), piece_y.checked_sub(1)),
-                    (piece_x.checked_sub(1), piece_y.checked_add(1)),
-                    (piece_x.checked_sub(1), piece_y.checked_sub(1)),
-                    (piece_x.checked_add(1), Some(piece_y)),
-                    (piece_x.checked_sub(1), Some(piece_y)),
-                    (Some(piece_x), piece_y.checked_add(1)),
-                    (Some(piece_x), piece_y.checked_sub(1)),
-                ]
-                    .into_iter()
-                    .filter_map(|(x, y)| {
-                        match (x, y) {
-                            (Some(x), Some(y)) if x <= 8 && y <= 8 && x > 0 && y > 0 =>
-                                Some(Command {
-                                    from,
-                                    piece: piece_type,
-                                    special: None,
-                                    takes: self.pieces.get(&(x, y)).is_some(),
-                                    to: (x, y),
-                                }),
-                            _ => None,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-            }
-            _ => unreachable!(),
-        }
-        moves
     }
 }
 
