@@ -384,11 +384,11 @@ impl Game {
                             (Some(to.0), to.1.checked_add(1)),
                             (Some(to.0), to.1.checked_sub(1)),
                         ]
-                            .iter()
+                            .into_iter()
                             .filter_map(|(x, y)| {
                                 match (x, y) {
-                                    (Some(x), Some(y)) if *x <= 8 && *y <= 8 && *x > 0 && *y > 0 =>
-                                        Some((*x, *y)),
+                                    (Some(x), Some(y)) if x <= 8 && y <= 8 && x > 0 && y > 0 =>
+                                        Some((x, y)),
                                     _ => None,
                                 }
                             })
@@ -590,11 +590,12 @@ impl Game {
     }
 
     pub fn get_all_possible_moves(&self, color: Color) -> Vec<Command> {
-        for ((piece_x, piece_y), Piece(piece_type, color)) in self.pieces
+        // todo: filter moves that put player in check
+        self.pieces
             .iter()
-            .filter(|(_, Piece(_, _color))| { _color == &color }) {
-        }
-        vec![]
+            .filter(|(_, Piece(_, _color))| { _color == &color })
+            .flat_map(|(coords, piece)| { self.get_piece_moves(*coords, *piece) })
+            .collect()
     }
 
     pub fn get_piece_moves(&self, piece_coords: (usize, usize), piece: Piece) -> Vec<Command> {
@@ -676,6 +677,34 @@ impl Game {
                         }
                     }
                 }
+            }
+            PieceType::King => {
+                // todo if can castle; should implement on King struct?
+                return [
+                    (piece_x.checked_add(1), piece_y.checked_add(1)),
+                    (piece_x.checked_add(1), piece_y.checked_sub(1)),
+                    (piece_x.checked_sub(1), piece_y.checked_add(1)),
+                    (piece_x.checked_sub(1), piece_y.checked_sub(1)),
+                    (piece_x.checked_add(1), Some(piece_y)),
+                    (piece_x.checked_sub(1), Some(piece_y)),
+                    (Some(piece_x), piece_y.checked_add(1)),
+                    (Some(piece_x), piece_y.checked_sub(1)),
+                ]
+                    .into_iter()
+                    .filter_map(|(x, y)| {
+                        match (x, y) {
+                            (Some(x), Some(y)) if x <= 8 && y <= 8 && x > 0 && y > 0 =>
+                                Some(Command {
+                                    from,
+                                    piece: piece_type,
+                                    special: None,
+                                    takes: self.pieces.get(&(x, y)).is_some(),
+                                    to: (x, y),
+                                }),
+                            _ => None,
+                        }
+                    })
+                    .collect::<Vec<_>>();
             }
             _ => unreachable!(),
         }
