@@ -150,8 +150,8 @@ mod tests {
             turn: Color::White,
             state: GameState::InProgress,
             pieces: vec![
-                ((2, 2), Piece::new(PieceType::King, Color::White)),
-                ((2, 4), Piece::new(PieceType::King, Color::Black))
+                ((2, 2), Piece(PieceType::King, Color::White)),
+                ((2, 4), Piece(PieceType::King, Color::Black))
             ]
                 .into_iter()
                 .collect(),
@@ -159,32 +159,32 @@ mod tests {
         assert!(!chess.is_check(Color::White));
         assert!(!chess.is_check(Color::Black));
 
-        chess.pieces.insert((2, 3), Piece::new(PieceType::Queen, Color::White));
+        chess.pieces.insert((2, 3), Piece(PieceType::Queen, Color::White));
         assert!(chess.is_check(Color::Black));
         assert!(!chess.is_check(Color::White));
 
-        chess.pieces.insert((2, 3), Piece::new(PieceType::Queen, Color::Black));
+        chess.pieces.insert((2, 3), Piece(PieceType::Queen, Color::Black));
         assert!(!chess.is_check(Color::Black));
         assert!(chess.is_check(Color::White));
 
         chess.pieces.remove(&(2, 3));
-        chess.pieces.insert((6, 6), Piece::new(PieceType::Bishop, Color::Black));
+        chess.pieces.insert((6, 6), Piece(PieceType::Bishop, Color::Black));
         assert!(chess.is_check(Color::White));
         assert!(!chess.is_check(Color::Black));
 
         chess.pieces.remove(&(6, 6));
-        chess.pieces.insert((6, 8), Piece::new(PieceType::Bishop, Color::White));
+        chess.pieces.insert((6, 8), Piece(PieceType::Bishop, Color::White));
         assert!(!chess.is_check(Color::White));
         assert!(chess.is_check(Color::Black));
 
         chess.pieces.remove(&(6, 8));
-        chess.pieces.insert((3, 3), Piece::new(PieceType::Pawn, Color::Black));
+        chess.pieces.insert((3, 3), Piece(PieceType::Pawn, Color::Black));
         assert!(chess.is_check(Color::White));
         chess.pieces.remove(&(3, 3));
-        chess.pieces.insert((1, 3), Piece::new(PieceType::Pawn, Color::Black));
+        chess.pieces.insert((1, 3), Piece(PieceType::Pawn, Color::Black));
         assert!(chess.is_check(Color::White));
         chess.pieces.remove(&(1, 3));
-        chess.pieces.insert((2, 3), Piece::new(PieceType::Pawn, Color::Black));
+        chess.pieces.insert((2, 3), Piece(PieceType::Pawn, Color::Black));
         println!("pieces:");
         for piece in &chess.pieces {
             println!("{:?}", piece);
@@ -193,7 +193,7 @@ mod tests {
         assert!(!chess.is_check(Color::White));
         chess.pieces.remove(&(2, 3));
 
-        chess.pieces.insert((2, 8), Piece::new(PieceType::Rook, Color::Black));
+        chess.pieces.insert((2, 8), Piece(PieceType::Rook, Color::Black));
         // can't check through own king
         assert!(!chess.is_check(Color::White));
         // remove king, now can check
@@ -245,20 +245,20 @@ mod tests {
             (7, 8),
         ];
         let pieces = [
-            Piece::new(PieceType::Pawn, Color::Black),
-            Piece::new(PieceType::Bishop, Color::White),
-            Piece::new(PieceType::Pawn, Color::Black),
-            Piece::new(PieceType::Pawn, Color::White),
-            Piece::new(PieceType::Knight, Color::Black),
-            Piece::new(PieceType::Pawn, Color::Black),
-            Piece::new(PieceType::Pawn, Color::White),
-            Piece::new(PieceType::Pawn, Color::Black),
-            Piece::new(PieceType::Bishop, Color::Black),
-            Piece::new(PieceType::Knight, Color::Black),
-            Piece::new(PieceType::Rook, Color::White),
-            Piece::new(PieceType::King, Color::White),
-            Piece::new(PieceType::Rook, Color::Black),
-            Piece::new(PieceType::King, Color::Black),
+            Piece(PieceType::Pawn, Color::Black),
+            Piece(PieceType::Bishop, Color::White),
+            Piece(PieceType::Pawn, Color::Black),
+            Piece(PieceType::Pawn, Color::White),
+            Piece(PieceType::Knight, Color::Black),
+            Piece(PieceType::Pawn, Color::Black),
+            Piece(PieceType::Pawn, Color::White),
+            Piece(PieceType::Pawn, Color::Black),
+            Piece(PieceType::Bishop, Color::Black),
+            Piece(PieceType::Knight, Color::Black),
+            Piece(PieceType::Rook, Color::White),
+            Piece(PieceType::King, Color::White),
+            Piece(PieceType::Rook, Color::Black),
+            Piece(PieceType::King, Color::Black),
         ];
 
         for (coord, piece) in coords.iter().zip(pieces.iter()) {
@@ -295,10 +295,10 @@ mod tests {
         for command in moves {
             game.play(Command::parse(command).unwrap()).unwrap();
         }
-        assert_eq!(game.pieces.get(&(3, 1)).unwrap(), &Piece::new(PieceType::King, Color::White));
-        assert_eq!(game.pieces.get(&(4, 1)).unwrap(), &Piece::new(PieceType::Rook, Color::White));
-        assert_eq!(game.pieces.get(&(3, 8)).unwrap(), &Piece::new(PieceType::King, Color::Black));
-        assert_eq!(game.pieces.get(&(4, 8)).unwrap(), &Piece::new(PieceType::Rook, Color::Black));
+        assert_eq!(game.pieces.get(&(3, 1)).unwrap(), &Piece(PieceType::King, Color::White));
+        assert_eq!(game.pieces.get(&(4, 1)).unwrap(), &Piece(PieceType::Rook, Color::White));
+        assert_eq!(game.pieces.get(&(3, 8)).unwrap(), &Piece(PieceType::King, Color::Black));
+        assert_eq!(game.pieces.get(&(4, 8)).unwrap(), &Piece(PieceType::Rook, Color::Black));
     }
 
     #[test]
@@ -313,9 +313,9 @@ mod tests {
         let result = chess.play(Command::parse("Ke7").unwrap());
         assert_eq!(result, Ok(()));
 
-        assert_eq!(chess.pieces.get(&(5, 5)), Some(&Piece::new(PieceType::Pawn, Color::Black)));
-        assert_eq!(chess.pieces.get(&(5, 2)), Some(&Piece::new(PieceType::King, Color::White)));
-        assert_eq!(chess.pieces.get(&(5, 7)), Some(&Piece::new(PieceType::King, Color::Black)));
+        assert_eq!(chess.pieces.get(&(5, 5)), Some(&Piece(PieceType::Pawn, Color::Black)));
+        assert_eq!(chess.pieces.get(&(5, 2)), Some(&Piece(PieceType::King, Color::White)));
+        assert_eq!(chess.pieces.get(&(5, 7)), Some(&Piece(PieceType::King, Color::Black)));
     }
 
     #[test]
@@ -336,10 +336,86 @@ mod tests {
         let result = chess.play(Command::parse("Qxf7+").unwrap());
         assert_eq!(result, Ok(()));
 
-        assert_eq!(chess.pieces.get(&(6, 7)), Some(&Piece::new(PieceType::Queen, Color::White)));
-        assert_eq!(chess.pieces.get(&(5, 8)), Some(&Piece::new(PieceType::King, Color::Black)));
-        assert_eq!(chess.pieces.get(&(3, 4)), Some(&Piece::new(PieceType::Bishop, Color::White)));
+        assert_eq!(chess.pieces.get(&(6, 7)), Some(&Piece(PieceType::Queen, Color::White)));
+        assert_eq!(chess.pieces.get(&(5, 8)), Some(&Piece(PieceType::King, Color::Black)));
+        assert_eq!(chess.pieces.get(&(3, 4)), Some(&Piece(PieceType::Bishop, Color::White)));
 
         assert_eq!(chess.state, GameState::Check(Color::Black));
+    }
+
+    #[test]
+    fn possible_moves() {
+        let pawn = Piece(PieceType::Pawn, Color::White);
+        let mut game = Game {
+            pieces: vec![((1, 2), pawn.clone())]
+                .into_iter()
+                .collect(),
+            state: GameState::InProgress,
+            turn: Color::White,
+        };
+
+        assert_eq!(game.get_piece_moves((1, 2), pawn).len(), 2);
+
+        game.pieces.insert((2, 3), Piece(PieceType::Knight, Color::White));
+        assert_eq!(game.get_piece_moves((1, 2), pawn).len(), 2);
+
+        game.pieces.insert((2, 3), Piece(PieceType::Knight, Color::Black));
+        assert_eq!(game.get_piece_moves((1, 2), pawn).len(), 3);
+
+        game.play(Command {
+            from: (None, None),
+            takes: false,
+            piece: PieceType::Pawn,
+            special: None,
+            to: (1, 3),
+        }).unwrap();
+        assert_eq!(game.get_piece_moves((1, 3), pawn).len(), 1);
+
+        let knight = Piece(PieceType::Knight, Color::Black);
+        game = Game {
+            turn: Color::Black,
+            state: GameState::InProgress,
+            pieces: vec![((2, 1), knight.clone())]
+                .into_iter()
+                .collect(),
+        };
+        let moves = game.get_piece_moves((2, 1), knight);
+        assert_eq!(moves.len(), 3);
+        assert_eq!(
+            moves.len(),
+            moves
+                .iter()
+                .filter(|m| !m.takes)
+                .collect::<Vec<_>>()
+                .len()
+        );
+
+        game.pieces.insert((4, 5), Piece(PieceType::Queen, Color::White));
+        game.play(Command {
+            from: (Some(2), Some(1)),
+            piece: PieceType::Knight,
+            special: None,
+            takes: false,
+            to: (3, 3),
+        }).unwrap();
+
+        let moves = game.get_piece_moves((3, 3), knight);
+        assert_eq!(moves.len(), 8);
+        assert_eq!(
+            moves
+                .iter()
+                .filter(|m| m.takes)
+                .collect::<Vec<_>>()
+                .len(),
+            1
+        );
+        assert_eq!(
+            moves
+                .iter()
+                .filter(|m| !m.takes)
+                .collect::<Vec<_>>()
+                .len(),
+            7
+        );
     }
 }

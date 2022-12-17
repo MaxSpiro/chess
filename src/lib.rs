@@ -25,7 +25,7 @@ pub enum GameState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Piece(PieceType, Color);
+pub struct Piece(pub PieceType, pub Color);
 
 impl Piece {
     pub fn new(piece_type: PieceType, color: Color) -> Self {
@@ -159,6 +159,46 @@ impl Command {
             to: notation_to_coords(to).unwrap(),
             special: check,
         });
+    }
+
+    pub fn to_notation(&self) -> String {
+        match self.special {
+            Some(Special::Castle) => {
+                return "O-O".to_string();
+            }
+            Some(Special::LongCastle) => {
+                return "O-O-O".to_string();
+            }
+            _ => {}
+        }
+        let mut notation = String::new();
+
+        if self.piece != PieceType::Pawn {
+            notation.push(match self.piece {
+                PieceType::Bishop => 'B',
+                PieceType::King => 'K',
+                PieceType::Knight => 'N',
+                PieceType::Queen => 'Q',
+                PieceType::Rook => 'R',
+                _ => unreachable!(),
+            });
+        } else {
+            if self.takes {
+                notation.push(
+                    column_index_to_letter(
+                        self.from.0.expect("Must have a-h specified for pawn takes")
+                    )
+                );
+            }
+        }
+        if self.takes {
+            notation.push('x');
+        }
+        notation.push_str(coords_to_notation(self.to).as_str());
+        if let Some(Special::Check) = self.special {
+            notation.push('+');
+        }
+        notation
     }
 }
 
@@ -314,10 +354,11 @@ impl Game {
                         (to.0.checked_sub(2), to.1.checked_add(1)),
                         (to.0.checked_sub(2), to.1.checked_sub(1)),
                     ]
-                        .iter()
+                        .into_iter()
                         .filter_map(|(x, y)| {
                             match (x, y) {
-                                (Some(x), Some(y)) if *x <= 8 && *y <= 8 => Some((*x, *y)),
+                                (Some(x), Some(y)) if x <= 8 && y <= 8 && x > 0 && y > 0 =>
+                                    Some((x, y)),
                                 _ => None,
                             }
                         })
@@ -346,7 +387,8 @@ impl Game {
                             .iter()
                             .filter_map(|(x, y)| {
                                 match (x, y) {
-                                    (Some(x), Some(y)) if *x <= 8 && *y <= 8 => Some((*x, *y)),
+                                    (Some(x), Some(y)) if *x <= 8 && *y <= 8 && *x > 0 && *y > 0 =>
+                                        Some((*x, *y)),
                                     _ => None,
                                 }
                             })
@@ -432,10 +474,17 @@ impl Game {
     }
 
     pub fn is_check(&self, color_in_check: Color) -> bool {
-        let ((king_x, king_y), _) = self.pieces
-            .iter()
-            .find(|(_, piece)| piece.0 == PieceType::King && piece.1 == color_in_check)
-            .unwrap();
+        let ((king_x, king_y), _) = match
+            self.pieces
+                .iter()
+                .find(|(_, piece)| piece.0 == PieceType::King && piece.1 == color_in_check)
+        {
+            Some(coords) => coords,
+            None => {
+                return false;
+            }
+        };
+
         let attacking_color = match color_in_check {
             Color::White => Color::Black,
             Color::Black => Color::White,
@@ -444,7 +493,7 @@ impl Game {
             .iter()
             .filter(|(_, piece)| piece.1 == attacking_color) {
             if
-                self.can_piece_reach(
+                self.can_piece_take(
                     (*piece_x, *piece_y),
                     (*king_x, *king_y),
                     *piece_type,
@@ -457,7 +506,7 @@ impl Game {
         false
     }
 
-    fn can_piece_reach(
+    fn can_piece_take(
         &self,
         from: (usize, usize),
         to: (usize, usize),
@@ -539,6 +588,99 @@ impl Game {
         }
         false
     }
+
+    pub fn get_all_possible_moves(&self, color: Color) -> Vec<Command> {
+        for ((piece_x, piece_y), Piece(piece_type, color)) in self.pieces
+            .iter()
+            .filter(|(_, Piece(_, _color))| { _color == &color }) {
+        }
+        vec![]
+    }
+
+    pub fn get_piece_moves(&self, piece_coords: (usize, usize), piece: Piece) -> Vec<Command> {
+        let Piece(piece_type, color) = piece;
+        let (piece_x, piece_y) = piece_coords;
+        let from = (Some(piece_x), Some(piece_y));
+        let mut moves = vec![];
+        match piece_type {
+            PieceType::Knight => {
+                return [
+                    (piece_x.checked_add(1), piece_y.checked_add(2)),
+                    (piece_x.checked_add(1), piece_y.checked_sub(2)),
+                    (piece_x.checked_sub(1), piece_y.checked_add(2)),
+                    (piece_x.checked_sub(1), piece_y.checked_sub(2)),
+                    (piece_x.checked_add(2), piece_y.checked_add(1)),
+                    (piece_x.checked_add(2), piece_y.checked_sub(1)),
+                    (piece_x.checked_sub(2), piece_y.checked_add(1)),
+                    (piece_x.checked_sub(2), piece_y.checked_sub(1)),
+                ]
+                    .into_iter()
+                    .filter_map(|(x, y)| {
+                        match (x, y) {
+                            (Some(x), Some(y)) if x <= 8 && y <= 8 && x > 0 && y > 0 =>
+                                Some(Command {
+                                    from,
+                                    piece: piece_type,
+                                    special: None,
+                                    takes: self.pieces.get(&(x, y)).is_some(),
+                                    to: (x, y),
+                                }),
+                            _ => None,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+            }
+            PieceType::Pawn => {
+                let pawn_row = match color {
+                    Color::White => 2,
+                    Color::Black => 7,
+                };
+                let range = if piece_y == pawn_row { 1..3 } else { 1..2 };
+                for step in range {
+                    let next_move = pawn_move(piece_y, step, color);
+                    if let Some(new_y) = next_move {
+                        if self.pieces.get(&(piece_x, new_y)).is_none() {
+                            moves.push(Command {
+                                from,
+                                takes: false,
+                                piece: piece_type,
+                                special: None,
+                                to: (piece_x, new_y),
+                            });
+                        }
+                        // can also calculate capture here when step_y is 1
+                        if step == 1 {
+                            let (left_x, right_x) = (
+                                piece_x.checked_sub(1),
+                                piece_x.checked_add(1),
+                            );
+                            for possible_capture in [left_x, right_x].into_iter().filter_map(|opt| {
+                                match opt {
+                                    Some(x) if x > 0 && x < 9 => Some((x, new_y)),
+                                    _ => None,
+                                }
+                            }) {
+                                match self.pieces.get(&possible_capture) {
+                                    Some(Piece(_, _color)) if _color != &color => {
+                                        moves.push(Command {
+                                            from,
+                                            piece: piece_type,
+                                            special: None,
+                                            takes: true,
+                                            to: possible_capture,
+                                        });
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => unreachable!(),
+        }
+        moves
+    }
 }
 
 fn notation_to_coords(notation: &str) -> Option<(usize, usize)> {
@@ -557,6 +699,14 @@ fn letter_to_column_index(letter: char) -> usize {
         panic!("How did we get here? I thought we checked this already.");
     }
     (letter as usize) - ('a' as usize) + 1
+}
+
+fn column_index_to_letter(col: usize) -> char {
+    if col < 1 || col > 8 {
+        panic!();
+    }
+    let char = col - 1 + ('a' as usize);
+    char as u8 as char
 }
 
 fn coords_to_notation(coords: (usize, usize)) -> String {
@@ -587,6 +737,17 @@ fn next_coords(
         return None;
     }
     Some((x as usize, y as usize))
+}
+
+fn pawn_move(y_coord: usize, step: isize, color: Color) -> Option<usize> {
+    let direction = if color == Color::White { 1 } else { -1 };
+    let new_y = (y_coord as isize) + step * direction;
+
+    if new_y < 1 || new_y > 8 {
+        None
+    } else {
+        Some(new_y as usize)
+    }
 }
 
 fn coords_between(from: (usize, usize), to: (usize, usize)) -> Vec<(usize, usize)> {
