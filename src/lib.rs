@@ -6,6 +6,15 @@ pub enum Color {
     Black,
 }
 
+impl Color {
+    fn opposite(&self) -> Self {
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PieceType {
     King,
@@ -14,6 +23,16 @@ pub enum PieceType {
     Bishop,
     Knight,
     Pawn,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Special {
+    Castle,
+    LongCastle,
+    Check,
+    Checkmate,
+    EnPassant,
+    Promotion,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -307,31 +326,6 @@ pub struct Command {
     pub takes: bool,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Special {
-    Castle,
-    LongCastle,
-    Check,
-    Checkmate,
-    EnPassant,
-    Promotion,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ChessError {
-    InvalidMove,
-}
-
-impl std::error::Error for ChessError {}
-
-impl std::fmt::Display for ChessError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ChessError::InvalidMove => write!(f, "Invalid move"),
-        }
-    }
-}
-
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -420,12 +414,17 @@ impl Command {
     }
 
     pub fn to_notation(&self) -> String {
+        let suffix = match self.special {
+            Some(Special::Check) => "+",
+            Some(Special::Checkmate) => "#",
+            _ => "",
+        };
         match self.special {
             Some(Special::Castle) => {
-                return "O-O".to_string();
+                return format!("O-O{}", suffix);
             }
             Some(Special::LongCastle) => {
-                return "O-O-O".to_string();
+                return format!("O-O-O{}", suffix);
             }
             _ => {}
         }
@@ -453,10 +452,53 @@ impl Command {
             notation.push('x');
         }
         notation.push_str(coords_to_notation(self.to).as_str());
-        if let Some(Special::Check) = self.special {
-            notation.push('+');
-        }
+        notation.push_str(suffix);
         notation
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ChessError {
+    InvalidMove,
+    InCheck,
+}
+
+use std::fmt::{ Display, Formatter };
+
+impl std::error::Error for ChessError {}
+
+impl Display for ChessError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            ChessError::InvalidMove => write!(f, "Invalid move"),
+            ChessError::InCheck =>
+                write!(
+                    f,
+                    "Cannot move into check. If you are in check, you must move out of check"
+                ),
+        }
+    }
+}
+
+impl Display for Game {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut board = String::new();
+        board.push_str("-".repeat(17).as_str());
+        board.push_str("\n");
+        for row in 1..=8 {
+            board.push('|');
+            for col in 1..=8 {
+                board.push(match self.pieces.get(&(col, 9 - row)) {
+                    Some(piece) => piece.letter(),
+                    None => ' ',
+                });
+                board.push('|');
+            }
+            board.push_str("\n");
+            board.push_str("-".repeat(17).as_str());
+            board.push_str("\n");
+        }
+        writeln!(f, "{}", board)
     }
 }
 
@@ -505,7 +547,7 @@ impl Game {
         }
     }
 
-    pub fn play(&mut self, input: Command) -> Result<(), ChessError> {
+    pub fn play(&mut self, input: &Command) -> Result<(), ChessError> {
         let Command { to, from, piece, takes, special } = input;
         let Game { turn: color, .. } = self;
         let other_color = match color {
@@ -515,7 +557,7 @@ impl Game {
         let (mut to_remove, mut to_insert) = (vec![], vec![]);
         let is_castle = match special {
             Some(castle @ Special::LongCastle | castle @ Special::Castle) => {
-                if piece != PieceType::King {
+                if piece != &PieceType::King {
                     return Err(ChessError::InvalidMove);
                 }
                 let rook_col = match castle {
@@ -565,7 +607,7 @@ impl Game {
                     }
                 }
                 None => {
-                    if takes {
+                    if *takes {
                         return Err(ChessError::InvalidMove);
                     }
                 }
@@ -583,7 +625,7 @@ impl Game {
                     }
                 };
                 let mut coords = vec![];
-                if takes {
+                if *takes {
                     let from_col = from.0.unwrap();
                     if from_col.abs_diff(to.0) != 1 {
                         return Err(ChessError::InvalidMove);
@@ -665,7 +707,7 @@ impl Game {
             'all_directions: for direction in directions {
                 let mut i = 1;
                 'inner: loop {
-                    let coords = match next_coords(to, direction, i) {
+                    let coords = match next_coords(*to, direction, i) {
                         Some(coords) => coords,
                         None => {
                             break 'inner;
@@ -673,13 +715,13 @@ impl Game {
                     };
                     match self.pieces.get(&coords) {
                         Some(ref _piece @ Piece { piece_type: _piecetype, color: _color }) if
-                            _piecetype == &piece &&
+                            _piecetype == piece &&
                             _color == color &&
-                            coords_match_from(coords, from)
+                            coords_match_from(coords, *from)
                         => {
                             piece_found = true;
                             to_remove.push(coords);
-                            to_insert.push(to);
+                            to_insert.push(*to);
                             break 'all_directions;
                         }
                         Some(_) => {
@@ -695,12 +737,12 @@ impl Game {
                 match self.pieces.get(&coords) {
                     Some(ref _piece @ Piece { piece_type: _piecetype, color: _color }) if
                         _color == color &&
-                        _piecetype == &piece &&
-                        coords_match_from(coords, from)
+                        _piecetype == piece &&
+                        coords_match_from(coords, *from)
                     => {
                         piece_found = true;
                         to_remove.push(coords);
-                        to_insert.push(to);
+                        to_insert.push(*to);
                         break;
                     }
                     _ => {}
@@ -711,13 +753,21 @@ impl Game {
             return Err(ChessError::InvalidMove);
         }
 
+        let mut new_game = self.clone();
+
         for (from, to) in to_remove.iter().zip(to_insert.iter()) {
-            let piece = self.pieces.remove(from);
-            self.pieces.insert(*to, piece.unwrap());
+            let piece = new_game.pieces.remove(from);
+            new_game.pieces.insert(*to, piece.unwrap());
         }
 
+        if new_game.is_check(new_game.turn) {
+            return Err(ChessError::InCheck);
+        }
+
+        *self = new_game;
+
         if self.is_check(other_color) {
-            println!("Check! {:?}", self.is_check(other_color));
+            println!("Check!");
             self.state = GameState::Check(other_color);
         }
         self.next_turn();
@@ -765,27 +815,27 @@ impl Game {
             .iter()
             .filter(|(_, Piece { color: _color, .. })| { _color == &color })
             .flat_map(|(coords, piece)| { piece.get_possible_moves(*coords, &self.pieces) })
+            .filter_map(|command| {
+                let mut new_board = self.clone();
+                if new_board.play(&command).is_err() {
+                    return None;
+                }
+                let puts_self_in_check = new_board.is_check(color);
+                if puts_self_in_check {
+                    None
+                } else {
+                    let gives_check = new_board.is_check(color.opposite());
+                    Some(Command {
+                        special: if gives_check {
+                            Some(Special::Check)
+                        } else {
+                            None
+                        },
+                        ..command
+                    })
+                }
+            })
             .collect()
-    }
-
-    pub fn board_string(&self) -> String {
-        let mut board = String::new();
-        board.push_str("-".repeat(17).as_str());
-        board.push_str("\n");
-        for row in 1..=8 {
-            board.push('|');
-            for col in 1..=8 {
-                board.push(match self.pieces.get(&(col, 9 - row)) {
-                    Some(piece) => piece.letter(),
-                    None => ' ',
-                });
-                board.push('|');
-            }
-            board.push_str("\n");
-            board.push_str("-".repeat(17).as_str());
-            board.push_str("\n");
-        }
-        board
     }
 }
 

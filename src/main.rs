@@ -8,13 +8,13 @@ fn main() {
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
-                    let result = chess.play(command);
+                    let result = chess.play(&command);
                     match result {
                         Ok(_) => {
-                            println!("{}", chess.board_string());
+                            println!("{}", chess);
                         }
                         Err(e) => {
-                            println!("{:?}", e);
+                            println!("{}", e);
                         }
                     }
                 } else {
@@ -227,7 +227,7 @@ mod tests {
 
         for command in moves {
             println!("{:?}: {}", chess.turn, command);
-            chess.play(Command::parse(command).unwrap()).unwrap();
+            chess.play(&Command::parse(command).unwrap()).unwrap();
         }
 
         let coords = [
@@ -287,7 +287,7 @@ mod tests {
             "Re1+",
         ];
         for command in moves {
-            game.play(Command::parse(command).unwrap()).unwrap();
+            game.play(&Command::parse(command).unwrap()).unwrap();
         }
         assert!(game.is_check(Color::Black));
 
@@ -295,7 +295,7 @@ mod tests {
         game = Game::new();
         let moves = ["Nc3", "Nc6", "d4", "d5", "Bf4", "Bg4", "Qd2", "Qd7", "O-O-O", "O-O-O"];
         for command in moves {
-            game.play(Command::parse(command).unwrap()).unwrap();
+            game.play(&Command::parse(command).unwrap()).unwrap();
         }
         assert_eq!(
             game.pieces.get(&(3, 1)).unwrap(),
@@ -318,13 +318,13 @@ mod tests {
     #[test]
     fn bongcloud() {
         let mut chess = Game::new();
-        let result = chess.play(Command::parse("e4").unwrap());
+        let result = chess.play(&Command::parse("e4").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("e5").unwrap());
+        let result = chess.play(&Command::parse("e5").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Ke2").unwrap());
+        let result = chess.play(&Command::parse("Ke2").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Ke7").unwrap());
+        let result = chess.play(&Command::parse("Ke7").unwrap());
         assert_eq!(result, Ok(()));
 
         assert_eq!(
@@ -344,19 +344,19 @@ mod tests {
     #[test]
     fn fried_liver() {
         let mut chess = Game::new();
-        let result = chess.play(Command::parse("e4").unwrap());
+        let result = chess.play(&Command::parse("e4").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("e5").unwrap());
+        let result = chess.play(&Command::parse("e5").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Qh5").unwrap());
+        let result = chess.play(&Command::parse("Qh5").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Nc6").unwrap());
+        let result = chess.play(&Command::parse("Nc6").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Bc4").unwrap());
+        let result = chess.play(&Command::parse("Bc4").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Nf6").unwrap());
+        let result = chess.play(&Command::parse("Nf6").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(Command::parse("Qxf7+").unwrap());
+        let result = chess.play(&Command::parse("Qxf7+").unwrap());
         assert_eq!(result, Ok(()));
 
         assert_eq!(
@@ -393,13 +393,15 @@ mod tests {
         game.pieces.insert((2, 3), Piece { piece_type: PieceType::Knight, color: Color::Black });
         assert_eq!(pawn.get_possible_moves((1, 2), &game.pieces).len(), 3);
 
-        game.play(Command {
-            from: (None, None),
-            takes: false,
-            piece: PieceType::Pawn,
-            special: None,
-            to: (1, 3),
-        }).unwrap();
+        game.play(
+            &(Command {
+                from: (None, None),
+                takes: false,
+                piece: PieceType::Pawn,
+                special: None,
+                to: (1, 3),
+            })
+        ).unwrap();
         assert_eq!(pawn.get_possible_moves((1, 3), &game.pieces).len(), 1);
 
         let knight = Piece { piece_type: PieceType::Knight, color: Color::Black };
@@ -430,13 +432,15 @@ mod tests {
         );
 
         game.pieces.insert((4, 5), Piece { piece_type: PieceType::Queen, color: Color::White });
-        game.play(Command {
-            from: (Some(2), Some(1)),
-            piece: PieceType::Knight,
-            special: None,
-            takes: false,
-            to: (3, 3),
-        }).unwrap();
+        game.play(
+            &(Command {
+                from: (Some(2), Some(1)),
+                piece: PieceType::Knight,
+                special: None,
+                takes: false,
+                to: (3, 3),
+            })
+        ).unwrap();
 
         let moves = knight.get_possible_moves((3, 3), &game.pieces);
         assert_eq!(moves.len(), 8);
@@ -456,5 +460,19 @@ mod tests {
                 .len(),
             7
         );
+
+        game = Game {
+            pieces: vec![
+                ((3, 5), Piece::new(PieceType::King, Color::Black)),
+                ((2, 3), Piece::new(PieceType::Pawn, Color::White))
+            ]
+                .into_iter()
+                .collect(),
+            state: GameState::InProgress,
+            turn: Color::White,
+        };
+        let moves = game.get_all_possible_moves(Color::White);
+        assert_eq!(moves.len(), 1);
+        assert_eq!(moves[0].to_notation(), "b4+");
     }
 }
