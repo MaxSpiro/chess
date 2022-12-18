@@ -35,6 +35,17 @@ impl Piece {
         Self { piece_type, color }
     }
 
+    pub fn letter(&self) -> char {
+        match self.piece_type {
+            PieceType::Knight => 'N',
+            PieceType::Pawn => 'P',
+            PieceType::Queen => 'Q',
+            PieceType::Rook => 'R',
+            PieceType::Bishop => 'B',
+            PieceType::King => 'K',
+        }
+    }
+
     pub fn get_possible_moves(
         &self,
         piece_coords: (usize, usize),
@@ -196,10 +207,11 @@ impl Piece {
                 }
             }
             PieceType::Queen => {
-                if to_x != from_x && to_y != from_y {
-                    if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
-                        return false;
-                    }
+                if
+                    to_x != from_x &&
+                    to_y != from_y &&
+                    to_x.abs_diff(from_x) != to_y.abs_diff(from_y)
+                {
                 }
             }
             PieceType::Rook => {
@@ -211,9 +223,6 @@ impl Piece {
                 if to_x.abs_diff(from_x) != to_y.abs_diff(from_y) {
                     return false;
                 }
-            }
-            _ => {
-                unreachable!();
             }
         }
 
@@ -237,7 +246,7 @@ impl Piece {
         false
     }
 
-    pub fn get_direction_vectors(&self) -> Vec<(isize, isize)> {
+    fn get_direction_vectors(&self) -> Vec<(isize, isize)> {
         match self.piece_type {
             PieceType::Bishop => vec![(1, 1), (1, -1), (-1, 1), (-1, -1)],
             PieceType::Rook => vec![(1, 0), (-1, 0), (0, 1), (0, -1)],
@@ -247,7 +256,7 @@ impl Piece {
         }
     }
 
-    pub fn get_candidate_moves(
+    fn get_candidate_moves(
         &self,
         piece_coords: (usize, usize)
     ) -> Vec<(Option<usize>, Option<usize>)> {
@@ -277,7 +286,7 @@ impl Piece {
                     (Some(piece_x), piece_y.checked_sub(1))
                 ]
             }
-            _ => panic!("Only call candidate moves on a king or knight"),
+            _ => panic!("Only call this method on a king or knight"),
         }
     }
 }
@@ -757,6 +766,26 @@ impl Game {
             .filter(|(_, Piece { color: _color, .. })| { _color == &color })
             .flat_map(|(coords, piece)| { piece.get_possible_moves(*coords, &self.pieces) })
             .collect()
+    }
+
+    pub fn board_string(&self) -> String {
+        let mut board = String::new();
+        board.push_str("-".repeat(17).as_str());
+        board.push_str("\n");
+        for row in 1..=8 {
+            board.push('|');
+            for col in 1..=8 {
+                board.push(match self.pieces.get(&(col, 9 - row)) {
+                    Some(piece) => piece.letter(),
+                    None => ' ',
+                });
+                board.push('|');
+            }
+            board.push_str("\n");
+            board.push_str("-".repeat(17).as_str());
+            board.push_str("\n");
+        }
+        board
     }
 }
 

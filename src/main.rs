@@ -10,7 +10,9 @@ fn main() {
                 if let Some(command) = Command::parse(&input.trim()) {
                     let result = chess.play(command);
                     match result {
-                        Ok(_) => {}
+                        Ok(_) => {
+                            println!("{}", chess.board_string());
+                        }
                         Err(e) => {
                             println!("{:?}", e);
                         }
