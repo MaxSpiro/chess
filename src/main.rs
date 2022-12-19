@@ -20,6 +20,14 @@ fn main() {
                 println!("Make a move, {:?}", chess.turn);
             }
         }
+        println!(
+            "Possible moves: {:?}",
+            chess
+                .get_all_possible_moves(chess.turn)
+                .into_iter()
+                .map(|c| c.to_notation())
+                .collect::<Vec<String>>()
+        );
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
@@ -388,92 +396,13 @@ mod tests {
 
     #[test]
     fn possible_moves() {
-        let pawn = Piece { piece_type: PieceType::Pawn, color: Color::White };
-        let mut game = Game {
-            pieces: vec![((1, 2), pawn.clone())]
-                .into_iter()
-                .collect(),
-            state: GameState::InProgress,
-            turn: Color::White,
-        };
-        assert_eq!(pawn.get_possible_moves((1, 2), &game.pieces).len(), 2);
+        let mut chess = Game::new();
 
-        game.pieces.insert((2, 3), Piece { piece_type: PieceType::Knight, color: Color::White });
-        assert_eq!(pawn.get_possible_moves((1, 2), &game.pieces).len(), 2);
+        chess.play(&Command::parse("e4").unwrap()).unwrap();
+        chess.play(&Command::parse("e5").unwrap()).unwrap();
+        chess.play(&Command::parse("Qh5").unwrap()).unwrap();
+        chess.play(&Command::parse("Nc6").unwrap()).unwrap();
 
-        game.pieces.insert((2, 3), Piece { piece_type: PieceType::Knight, color: Color::Black });
-        assert_eq!(pawn.get_possible_moves((1, 2), &game.pieces).len(), 3);
-
-        game.play(&CommandBuilder::new().to((1, 3)).piece(PieceType::Pawn).build()).unwrap();
-        assert_eq!(pawn.get_possible_moves((1, 3), &game.pieces).len(), 1);
-
-        let knight = Piece { piece_type: PieceType::Knight, color: Color::Black };
-        game = Game {
-            turn: Color::Black,
-            state: GameState::InProgress,
-            pieces: vec![((2, 1), knight.clone())]
-                .into_iter()
-                .collect(),
-        };
-        let moves = knight.get_possible_moves((2, 1), &game.pieces);
-        println!(
-            "{:?}\n{:?}",
-            game.pieces,
-            moves
-                .iter()
-                .map(|m| m.to_notation())
-                .collect::<Vec<_>>()
-        );
-        assert_eq!(moves.len(), 3);
-        assert_eq!(
-            moves.len(),
-            moves
-                .iter()
-                .filter(|m| !m.takes)
-                .collect::<Vec<_>>()
-                .len()
-        );
-
-        game.pieces.insert((4, 5), Piece { piece_type: PieceType::Queen, color: Color::White });
-        game.play(
-            &CommandBuilder::new()
-                .from((Some(2), Some(1)))
-                .piece(PieceType::Knight)
-                .to((3, 3))
-                .build()
-        ).unwrap();
-
-        let moves = knight.get_possible_moves((3, 3), &game.pieces);
-        assert_eq!(moves.len(), 8);
-        assert_eq!(
-            moves
-                .iter()
-                .filter(|m| m.takes)
-                .collect::<Vec<_>>()
-                .len(),
-            1
-        );
-        assert_eq!(
-            moves
-                .iter()
-                .filter(|m| !m.takes)
-                .collect::<Vec<_>>()
-                .len(),
-            7
-        );
-
-        game = Game {
-            pieces: vec![
-                ((3, 5), Piece::new(PieceType::King, Color::Black)),
-                ((2, 3), Piece::new(PieceType::Pawn, Color::White))
-            ]
-                .into_iter()
-                .collect(),
-            state: GameState::InProgress,
-            turn: Color::White,
-        };
-        let moves = game.get_all_possible_moves(Color::White);
-        assert_eq!(moves.len(), 1);
-        // assert_eq!(moves[0].to_notation(), "b4+");
+        assert_eq!(chess.get_all_possible_moves(Color::White).len(), 37)
     }
 }

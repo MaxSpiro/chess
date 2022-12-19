@@ -31,6 +31,12 @@ pub enum Castle {
     QueenSide,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Check {
+    Check,
+    Checkmate,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GameState {
     InProgress,
@@ -158,6 +164,31 @@ impl Piece {
             }
         }
         moves
+            .into_iter()
+            .map(|command| {
+                let game = Game::from(pieces_on_board.clone(), self.color);
+                match game.simulate_move(&command) {
+                    Ok(_) => {
+                        match game.state {
+                            GameState::Checkmate(_) => {
+                                Command {
+                                    check: Some(Check::Checkmate),
+                                    ..command
+                                }
+                            }
+                            GameState::Check(_) => {
+                                Command {
+                                    check: Some(Check::Check),
+                                    ..command
+                                }
+                            }
+                            _ => { command }
+                        }
+                    }
+                    Err(_) => { command }
+                }
+            })
+            .collect()
     }
 
     fn can_move(
@@ -320,6 +351,7 @@ pub struct Command {
     pub from: (Option<usize>, Option<usize>),
     pub to: (usize, usize),
     pub takes: bool,
+    pub check: Option<Check>,
     pub castle: Option<Castle>,
 }
 
@@ -329,6 +361,7 @@ pub struct CommandBuilder {
     from: Option<(Option<usize>, Option<usize>)>,
     to: Option<(usize, usize)>,
     takes: Option<bool>,
+    check: Option<Check>,
     castle: Option<Castle>,
 }
 
@@ -339,6 +372,7 @@ impl CommandBuilder {
             from: None,
             to: None,
             takes: None,
+            check: None,
             castle: None,
         }
     }
@@ -368,12 +402,18 @@ impl CommandBuilder {
         self
     }
 
+    pub fn check(mut self, check: Option<Check>) -> Self {
+        self.check = check;
+        self
+    }
+
     pub fn build(self) -> Command {
         Command {
             piece: self.piece.unwrap(),
             to: self.to.unwrap_or((0, 0)),
             from: self.from.unwrap_or((None, None)),
             takes: self.takes.unwrap_or(false),
+            check: self.check,
             castle: self.castle,
         }
     }
@@ -440,26 +480,40 @@ impl Command {
             }
         }
         let to = captures.name("to").unwrap().as_str();
-        // todo re implement check in commands
-        let check = captures.name("check").is_some();
+        let check = match captures.name("check") {
+            Some(check) => {
+                match check.as_str() {
+                    "+" => Some(Check::Check),
+                    "#" => Some(Check::Checkmate),
+                    _ => None,
+                }
+            }
+            None => None,
+        };
 
         Some(
             command_builder
-                .from((from_col, from_row))
-                .piece(piece)
-                .takes(takes)
                 .to(notation_to_coords(to).unwrap())
+                .piece(piece)
+                .from((from_col, from_row))
+                .takes(takes)
+                .check(check)
                 .build()
         )
     }
 
     pub fn to_notation(&self) -> String {
+        let suffix = match self.check {
+            Some(Check::Check) => "+",
+            Some(Check::Checkmate) => "#",
+            None => "",
+        };
         match self.castle {
             Some(Castle::KingSide) => {
-                return format!("O-O");
+                return format!("O-O{}", suffix);
             }
             Some(Castle::QueenSide) => {
-                return format!("O-O-O");
+                return format!("O-O-O,{}", suffix);
             }
             _ => {}
         }
@@ -487,6 +541,7 @@ impl Command {
             notation.push('x');
         }
         notation.push_str(coords_to_notation(self.to).as_str());
+        notation.push_str(suffix);
         notation
     }
 }
@@ -581,9 +636,17 @@ impl Game {
         }
     }
 
+    pub fn from(pieces: HashMap<(usize, usize), Piece>, turn: Color) -> Game {
+        Game {
+            pieces,
+            turn,
+            state: GameState::InProgress,
+        }
+    }
+
     pub fn simulate_move(&self, input: &Command) -> Result<Self, ChessError> {
         let mut new_board = self.clone();
-        let Command { to, from, piece, takes, castle } = input;
+        let Command { to, from, piece, takes, castle, .. } = input;
         let Game { turn: color, .. } = new_board;
 
         match self.pieces.get(&to) {
@@ -667,14 +730,7 @@ impl Game {
 
         let is_check = self.is_check(self.turn);
         let moves = self.get_all_possible_moves(self.turn);
-        println!("{}", self);
-        println!(
-            "{:?}",
-            moves
-                .iter()
-                .map(|m| m.to_notation())
-                .collect::<Vec<_>>()
-        );
+
         if is_check && moves.len() == 0 {
             self.state = GameState::Checkmate(self.turn.opposite());
         } else if is_check && moves.len() != 0 {
@@ -691,6 +747,15 @@ impl Game {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
+    }
+
+    // these are both expensive calculations and should be cached or called less often
+    pub fn is_checkmate(&self, color_in_check: Color) -> bool {
+        self.is_check(color_in_check) && self.get_all_possible_moves(color_in_check).len() == 0
+    }
+
+    pub fn is_stalemate(&self, color_in_check: Color) -> bool {
+        !self.is_check(color_in_check) && self.get_all_possible_moves(color_in_check).len() == 0
     }
 
     pub fn is_check(&self, color_in_check: Color) -> bool {
@@ -726,9 +791,7 @@ impl Game {
             .iter()
             .filter(|(_, Piece { color: _color, .. })| { _color == &color })
             .flat_map(|(coords, piece)| { piece.get_possible_moves(*coords, &self.pieces) })
-            .filter_map(|command| {
-                if self.simulate_move(&command).is_ok() { Some(command) } else { None }
-            })
+            .filter(|command| { self.simulate_move(&command).is_ok() })
             .collect()
     }
 }
@@ -798,22 +861,4 @@ fn pawn_move(y_coord: usize, step: isize, color: Color) -> Option<usize> {
     } else {
         Some(new_y as usize)
     }
-}
-
-fn coords_between(from: (usize, usize), to: (usize, usize)) -> Vec<(usize, usize)> {
-    let (from_x, from_y) = from;
-    let (to_x, to_y) = to;
-    let (direction_x, direction_y) = (from_x.cmp(&to_x) as isize, from_y.cmp(&to_y) as isize);
-    let mut i = 1;
-    let mut coords = vec![];
-    while from_x != to_x || from_y != to_y {
-        coords.push(match next_coords((from_x, from_y), (direction_x, direction_y), i) {
-            Some(coords) => coords,
-            None => {
-                break;
-            }
-        });
-        i += 1;
-    }
-    coords
 }
