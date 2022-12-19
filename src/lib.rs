@@ -547,9 +547,10 @@ impl Game {
         }
     }
 
-    pub fn play(&mut self, input: &Command) -> Result<(), ChessError> {
+    pub fn simulate_move(&self, input: &Command) -> Result<Self, ChessError> {
+        let mut new_game = self.clone();
         let Command { to, from, piece, takes, special } = input;
-        let Game { turn: color, .. } = self;
+        let Game { turn: color, .. } = new_game;
         let other_color = match color {
             Color::White => Color::Black,
             Color::Black => Color::White,
@@ -633,10 +634,7 @@ impl Game {
                     coords.push((from_col, diff(to.1, 1)));
                 } else {
                     coords.push((to.0, diff(to.1, 1)));
-                    if
-                        (*color == Color::White && to.1 == 4) ||
-                        (*color == Color::Black && to.1 == 5)
-                    {
+                    if (color == Color::White && to.1 == 4) || (color == Color::Black && to.1 == 5) {
                         coords.push((to.0, diff(to.1, 2)));
                     }
                 }
@@ -716,7 +714,7 @@ impl Game {
                     match self.pieces.get(&coords) {
                         Some(ref _piece @ Piece { piece_type: _piecetype, color: _color }) if
                             _piecetype == piece &&
-                            _color == color &&
+                            _color == &color &&
                             coords_match_from(coords, *from)
                         => {
                             piece_found = true;
@@ -736,7 +734,7 @@ impl Game {
             for coords in possible_coords {
                 match self.pieces.get(&coords) {
                     Some(ref _piece @ Piece { piece_type: _piecetype, color: _color }) if
-                        _color == color &&
+                        _color == &color &&
                         _piecetype == piece &&
                         coords_match_from(coords, *from)
                     => {
@@ -753,8 +751,6 @@ impl Game {
             return Err(ChessError::InvalidMove);
         }
 
-        let mut new_game = self.clone();
-
         for (from, to) in to_remove.iter().zip(to_insert.iter()) {
             let piece = new_game.pieces.remove(from);
             new_game.pieces.insert(*to, piece.unwrap());
@@ -764,13 +760,25 @@ impl Game {
             return Err(ChessError::InCheck);
         }
 
-        *self = new_game;
+        Ok(new_game)
+    }
 
-        if self.is_check(other_color) {
-            println!("Check!");
-            self.state = GameState::Check(other_color);
-        }
+    pub fn play(&mut self, command: &Command) -> Result<(), ChessError> {
+        let new_game = self.simulate_move(command)?;
+
+        *self = new_game;
         self.next_turn();
+
+        // in the new game, get all possible moves for the other color
+        // these moves are all valid; they do not put self in check
+        // also, moves that give check are marked for check
+        let moves = self.get_all_possible_moves(self.turn);
+        if moves.len() == 0 {
+            self.state = GameState::Checkmate(self.turn.opposite());
+        } else if self.is_check(self.turn) {
+            self.state = GameState::Check(self.turn);
+        }
+
         Ok(())
     }
 
@@ -810,29 +818,26 @@ impl Game {
     }
 
     pub fn get_all_possible_moves(&self, color: Color) -> Vec<Command> {
-        // todo: filter moves that put player in check
         self.pieces
             .iter()
             .filter(|(_, Piece { color: _color, .. })| { _color == &color })
             .flat_map(|(coords, piece)| { piece.get_possible_moves(*coords, &self.pieces) })
             .filter_map(|command| {
-                let mut new_board = self.clone();
-                if new_board.play(&command).is_err() {
-                    return None;
-                }
-                let puts_self_in_check = new_board.is_check(color);
-                if puts_self_in_check {
-                    None
-                } else {
-                    let gives_check = new_board.is_check(color.opposite());
-                    Some(Command {
-                        special: if gives_check {
-                            Some(Special::Check)
-                        } else {
-                            None
-                        },
-                        ..command
-                    })
+                match self.simulate_move(&command) {
+                    Ok(new_board) => {
+                        let gives_check = new_board.is_check(color.opposite());
+                        Some(Command {
+                            special: if gives_check {
+                                Some(Special::Check)
+                            } else {
+                                None
+                            },
+                            ..command
+                        })
+                    }
+                    Err(_) => {
+                        return None;
+                    }
                 }
             })
             .collect()

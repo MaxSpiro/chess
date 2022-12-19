@@ -1,10 +1,25 @@
-use chess::{ Command, Game };
+use chess::{ Command, Game, GameState };
 
 fn main() {
     let mut chess = Game::new();
     let mut input = String::new();
     loop {
-        println!("It is {:?}'s turn, enter a move", &chess.turn);
+        match chess.state {
+            GameState::Checkmate(color) => {
+                println!("Checkmate! {:?} wins!", &color);
+                break;
+            }
+            GameState::Check(color) => {
+                println!("Check! {:?} is in check! Make a move", &color);
+            }
+            GameState::Stalemate => {
+                println!("Stalemate! It's a draw!");
+                break;
+            }
+            GameState::InProgress => {
+                println!("Make a move, {:?}", chess.turn);
+            }
+        }
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if let Some(command) = Command::parse(&input.trim()) {
@@ -356,7 +371,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         let result = chess.play(&Command::parse("Nf6").unwrap());
         assert_eq!(result, Ok(()));
-        let result = chess.play(&Command::parse("Qxf7+").unwrap());
+        let result = chess.play(&Command::parse("Qxf7#").unwrap());
         assert_eq!(result, Ok(()));
 
         assert_eq!(
@@ -372,7 +387,7 @@ mod tests {
             Some(&(Piece { piece_type: PieceType::Bishop, color: Color::White }))
         );
 
-        assert_eq!(chess.state, GameState::Check(Color::Black));
+        assert_eq!(chess.state, GameState::Checkmate(Color::White));
     }
 
     #[test]
