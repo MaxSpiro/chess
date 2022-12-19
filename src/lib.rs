@@ -141,20 +141,21 @@ impl Piece {
                     let mut step = 1;
                     loop {
                         if let Some(next_coords) = next_coords(piece_coords, direction, step) {
-                            let takes;
                             match pieces_on_board.get(&next_coords) {
                                 Some(piece) => {
-                                    if piece.color == self.color {
-                                        break;
-                                    } else {
-                                        takes = true;
+                                    if piece.color != self.color {
+                                        moves.push(
+                                            command_builder.takes(true).to(next_coords).build()
+                                        );
                                     }
+                                    break;
                                 }
                                 None => {
-                                    takes = false;
+                                    moves.push(
+                                        command_builder.takes(false).to(next_coords).build()
+                                    );
                                 }
                             }
-                            moves.push(command_builder.takes(takes).to(next_coords).build());
                         } else {
                             break;
                         }
@@ -164,31 +165,6 @@ impl Piece {
             }
         }
         moves
-            .into_iter()
-            .map(|command| {
-                let game = Game::from(pieces_on_board.clone(), self.color);
-                match game.simulate_move(&command) {
-                    Ok(_) => {
-                        match game.state {
-                            GameState::Checkmate(_) => {
-                                Command {
-                                    check: Some(Check::Checkmate),
-                                    ..command
-                                }
-                            }
-                            GameState::Check(_) => {
-                                Command {
-                                    check: Some(Check::Check),
-                                    ..command
-                                }
-                            }
-                            _ => { command }
-                        }
-                    }
-                    Err(_) => { command }
-                }
-            })
-            .collect()
     }
 
     fn can_move(
@@ -728,16 +704,7 @@ impl Game {
         *self = new_game;
         self.next_turn();
 
-        let is_check = self.is_check(self.turn);
-        let moves = self.get_all_possible_moves(self.turn);
-
-        if is_check && moves.len() == 0 {
-            self.state = GameState::Checkmate(self.turn.opposite());
-        } else if is_check && moves.len() != 0 {
-            self.state = GameState::Check(self.turn);
-        } else if !is_check && moves.len() == 0 {
-            self.state = GameState::Stalemate;
-        }
+        self.state = self.get_game_state();
 
         Ok(())
     }
@@ -749,13 +716,19 @@ impl Game {
         };
     }
 
-    // these are both expensive calculations and should be cached or called less often
-    pub fn is_checkmate(&self, color_in_check: Color) -> bool {
-        self.is_check(color_in_check) && self.get_all_possible_moves(color_in_check).len() == 0
-    }
+    pub fn get_game_state(&self) -> GameState {
+        let all_moves = self.get_all_possible_moves(self.turn);
+        let is_check = self.is_check(self.turn);
 
-    pub fn is_stalemate(&self, color_in_check: Color) -> bool {
-        !self.is_check(color_in_check) && self.get_all_possible_moves(color_in_check).len() == 0
+        if is_check && all_moves.len() == 0 {
+            GameState::Checkmate(self.turn.opposite())
+        } else if is_check && all_moves.len() != 0 {
+            GameState::Check(self.turn)
+        } else if !is_check && all_moves.len() == 0 {
+            GameState::Stalemate
+        } else {
+            GameState::InProgress
+        }
     }
 
     pub fn is_check(&self, color_in_check: Color) -> bool {
@@ -791,7 +764,26 @@ impl Game {
             .iter()
             .filter(|(_, Piece { color: _color, .. })| { _color == &color })
             .flat_map(|(coords, piece)| { piece.get_possible_moves(*coords, &self.pieces) })
-            .filter(|command| { self.simulate_move(&command).is_ok() })
+            .filter_map(|command| {
+                match self.simulate_move(&command) {
+                    Ok(game) => {
+                        match game.get_game_state() {
+                            GameState::Check(_) =>
+                                Some(Command {
+                                    check: Some(Check::Check),
+                                    ..command
+                                }),
+                            GameState::Checkmate(_) =>
+                                Some(Command {
+                                    check: Some(Check::Checkmate),
+                                    ..command
+                                }),
+                            _ => { Some(command) }
+                        }
+                    }
+                    Err(_) => { None }
+                }
+            })
             .collect()
     }
 }

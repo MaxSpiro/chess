@@ -57,7 +57,7 @@ fn main() {
 mod tests {
     use std::collections::HashMap;
 
-    use chess::{ ChessError, Color, GameState, Piece, PieceType, Castle, CommandBuilder };
+    use chess::{ ChessError, Color, GameState, Piece, PieceType, Castle, CommandBuilder, Check };
 
     use super::*;
 
@@ -403,6 +403,28 @@ mod tests {
         chess.play(&Command::parse("Qh5").unwrap()).unwrap();
         chess.play(&Command::parse("Nc6").unwrap()).unwrap();
 
-        assert_eq!(chess.get_all_possible_moves(Color::White).len(), 37)
+        let moves = chess.get_all_possible_moves(Color::White);
+        println!(
+            "{:?}",
+            moves
+                .iter()
+                .map(|m| m.to_notation())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(moves.len(), 39);
+        assert_eq!(
+            moves
+                .iter()
+                .filter(|m| { m.takes })
+                .count(),
+            3
+        );
+        assert_eq!(
+            moves
+                .iter()
+                .filter(|m| { m.check.is_some() && m.check.unwrap() == Check::Check })
+                .count(),
+            2
+        );
     }
 }
