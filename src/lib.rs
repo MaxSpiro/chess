@@ -645,7 +645,6 @@ impl Game {
             let rook_col = match castle {
                 Castle::QueenSide => 1,
                 Castle::KingSide => 8,
-                _ => unreachable!(),
             };
             let home_row = match color {
                 Color::White => 1,
@@ -658,7 +657,6 @@ impl Game {
             let (to_king, to_rook) = match castle {
                 Castle::QueenSide => ((3, home_row), (4, home_row)),
                 Castle::KingSide => ((7, home_row), (6, home_row)),
-                _ => unreachable!(),
             };
             if self.pieces.get(&to_king).is_some() || self.pieces.get(&to_rook).is_some() {
                 return Err(ChessError::InvalidMove);
@@ -666,7 +664,6 @@ impl Game {
             let range = match castle {
                 Castle::QueenSide => 2..5,
                 Castle::KingSide => 6..8,
-                _ => unreachable!(),
             };
             for col in range {
                 if self.pieces.get(&(col, home_row)).is_some() {
