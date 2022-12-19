@@ -767,15 +767,10 @@ impl Game {
             .filter_map(|command| {
                 match self.simulate_move(&command) {
                     Ok(game) => {
-                        match game.get_game_state() {
-                            GameState::Check(_) =>
+                        match game.is_check(self.turn.opposite()) {
+                            true =>
                                 Some(Command {
                                     check: Some(Check::Check),
-                                    ..command
-                                }),
-                            GameState::Checkmate(_) =>
-                                Some(Command {
-                                    check: Some(Check::Checkmate),
                                     ..command
                                 }),
                             _ => { Some(command) }
